@@ -616,6 +616,7 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
                         val addresses =
                             geocoder.getFromLocation(location.latitude, location.longitude, 1)
                         Log.d("Haibq", "moveToCurrentLocation: " + addresses!![0].getAddressLine(0))
+                        getAddressFromLocation(location.latitude,location.longitude)
                         binding.tvLocation.text = addresses!![0].getAddressLine(0)
 //                        if (!addresses.isNullOrEmpty()) {
 //                            val city = addresses[0].getAddressLine(0).split(",").run {
@@ -634,7 +635,25 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
             Log.d("Haibq", "moveToCurrentLocation: 1")
         }
     }
+    fun getAddressFromLocation(lat: Double, lon: Double) {
+        val geocoder = Geocoder(requireContext(), Locale.getDefault())
+        try {
+            val addresses = geocoder.getFromLocation(lat, lon, 1)
+            if (!addresses.isNullOrEmpty()) {
+                val address = addresses[0]
+                val fullAddress = address.getAddressLine(0) // địa chỉ đầy đủ
+                val street = address.thoroughfare            // tên đường
+                val district = address.subLocality           // phường
+                val city = address.locality                  // thành phố
+                val province = address.adminArea             // tỉnh/thành
+                val country = address.countryName            // quốc gia
 
+                Log.d("Haibq", "Địa chỉ: $fullAddress")
+            }
+        } catch (e: IOException) {
+            e.printStackTrace()
+        }
+    }
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
