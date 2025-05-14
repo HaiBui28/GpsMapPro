@@ -9,18 +9,22 @@ import android.content.pm.PackageManager
 import android.content.res.Resources
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Matrix
 import android.location.Geocoder
 import android.media.ExifInterface
 import android.os.Bundle
+import android.os.Looper
 import android.provider.MediaStore
 import android.util.Log
 import android.util.Size
 import android.view.MotionEvent
+import android.view.PixelCopy
 import android.view.View
 import android.view.ViewGroup
 import android.view.animation.DecelerateInterpolator
+import android.widget.ImageView
 import android.widget.SeekBar
 import android.widget.Toast
 import androidx.annotation.OptIn
@@ -48,9 +52,11 @@ import androidx.camera.video.VideoRecordEvent
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.doOnLayout
+import androidx.core.view.drawToBitmap
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
+import com.google.android.gms.maps.MapView
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.LatLng
@@ -58,7 +64,6 @@ import com.google.android.gms.maps.model.MarkerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanner
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
-import com.orhanobut.hawk.Hawk
 import com.tapbi.spark.gpsmappro.R
 import com.tapbi.spark.gpsmappro.databinding.FragmentCameraBinding
 import com.tapbi.spark.gpsmappro.ui.base.BaseBindingFragment
@@ -76,7 +81,7 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
     OnMapReadyCallback {
     private var googleMap: GoogleMap? = null
 
-    private lateinit var imageCapture: ImageCapture
+    private var imageCapture: ImageCapture? = null
     private lateinit var videoCapture: VideoCapture<Recorder>
     private lateinit var cameraControl: CameraControl
     private lateinit var cameraInfo: CameraInfo
@@ -239,6 +244,7 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
     private fun startCamera() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(requireContext())
         cameraProviderFuture.addListener({
+            Log.d("chungvv", "cameraProviderFuture: ")
             cameraProvider = cameraProviderFuture.get()
 
             binding.previewView.doOnLayout {
@@ -248,15 +254,17 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
 
         }, ContextCompat.getMainExecutor(requireContext()))
     }
+
     private fun bindCameraUseCases() {
+        Log.d("chungvv", "bindCameraUseCases: ")
         val preview = Preview.Builder()
             .setTargetAspectRatio(selectedAspectRatio) // AspectRatio.RATIO_4_3 hoặc RATIO_16_9
             .build()
 
-        val imageCapture = ImageCapture.Builder()
+        imageCapture = ImageCapture.Builder()
             .setTargetAspectRatio(selectedAspectRatio)
             .build()
-
+        Log.d("chungvv", "imageCapture : $imageCapture")
         val recorder = Recorder.Builder()
             .setQualitySelector(QualitySelector.from(Quality.HIGHEST))
             .build()
@@ -379,25 +387,41 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
         val outputOptions = ImageCapture.OutputFileOptions.Builder(file).build()
 
         animateFlash()
-
-        imageCapture.takePicture(
+        Log.d("chungvv", "imageCapture : $imageCapture")
+        imageCapture?.takePicture(
             outputOptions,
             ContextCompat.getMainExecutor(requireContext()),
             object : ImageCapture.OnImageSavedCallback {
                 override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-                    if (isFrontCamera) {
-                        // Nếu là camera trước → lật gương ảnh
-                        val filePath = file.absolutePath
-                        val bitmap = BitmapFactory.decodeFile(filePath)
-                        val corrected = bitmap.correctOrientation(filePath)
-                        val mirroredBitmap = corrected.mirrorHorizontally()
-                        mirroredBitmap.saveToGallery(requireContext())
-                    } else {
-                        // Nếu là camera sau → lưu thẳng vào gallery
-                        saveFileToGallery(requireContext(), file)
+                    val filePath = file.absolutePath
+                    val bitmapCamera = BitmapFactory.decodeFile(filePath)
+                        .correctOrientation(filePath)
+                        .let { if (isFrontCamera) it.mirrorHorizontally() else it }
+                    val mapFragment = childFragmentManager.findFragmentById(R.id.map) as SupportMapFragment
+                    mapFragment.getMapAsync { googleMap ->
+                        googleMap.snapshot { mapBitmap ->
+                            if (mapBitmap!=null){
+                                // Bước 1: Thay thế map fragment bằng snapshot
+                                replaceMapFragmentWithSnapshot(mapBitmap)
+
+                                // Bước 2: Chờ 1 frame → rồi render llMap
+                                binding.llMap.post {
+                                    val bitmapOverlay = binding.llMap.drawToBitmap()
+
+                                    // Bước 3: Gộp với ảnh từ camera
+                                    val finalBitmap = mergeBitmaps(bitmapCamera, bitmapOverlay)
+
+                                    // Bước 4: Lưu ảnh
+                                    finalBitmap.saveToGallery(requireContext())
+
+                                    Toast.makeText(context, "Đã lưu ảnh với overlay", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+
+                        }
                     }
 
-                    Toast.makeText(context, "Ảnh đã lưu", Toast.LENGTH_SHORT).show()
+
                 }
 
                 override fun onError(exception: ImageCaptureException) {
@@ -409,6 +433,51 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
                 }
             }
         )
+    }
+
+    fun replaceMapFragmentWithSnapshot(mapBitmap: Bitmap) {
+        val imageView = ImageView(requireContext()).apply {
+            setImageBitmap(mapBitmap)
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        }
+
+        val cardView = binding.cardView // cardView chứa fragment
+        cardView.removeAllViews()
+        cardView.addView(imageView)
+    }
+
+
+
+
+
+
+
+    private fun mergeBitmaps(cameraBitmap: Bitmap, overlayBitmap: Bitmap): Bitmap {
+        val result = Bitmap.createBitmap(
+            cameraBitmap.width,
+            cameraBitmap.height,
+            cameraBitmap.config
+        )
+        val canvas = Canvas(result)
+        canvas.drawBitmap(cameraBitmap, 0f, 0f, null)
+
+        // Scale overlay nếu cần cho vừa khung
+        val scaledOverlay = Bitmap.createScaledBitmap(
+            overlayBitmap,
+            cameraBitmap.width,
+            overlayBitmap.height * cameraBitmap.width / overlayBitmap.width,
+            true
+        )
+
+        // Gắn overlay xuống dưới cùng
+        val topOffset = cameraBitmap.height - scaledOverlay.height
+        canvas.drawBitmap(scaledOverlay, 0f, topOffset.toFloat(), null)
+
+        return result
     }
 
     fun Bitmap.correctOrientation(filePath: String): Bitmap {
@@ -529,10 +598,13 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
         ) {
             googleMap?.isMyLocationEnabled = true
             fusedLocationClient.lastLocation.addOnSuccessListener { location ->
-                Log.d("Haibq", "moveToCurrentLocation: "+ (location == null))
+                Log.d("Haibq", "moveToCurrentLocation: " + (location == null))
                 if (location != null) {
                     val latLng = LatLng(location.latitude, location.longitude)
-                    Log.d("Haibq", "moveToCurrentLocation: "+ location.latitude + " " + location.longitude)
+                    Log.d(
+                        "Haibq",
+                        "moveToCurrentLocation: " + location.latitude + " " + location.longitude
+                    )
                     googleMap?.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 16f))
                     googleMap.addMarker(
                         MarkerOptions()
@@ -541,8 +613,9 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
                     )
                     try {
                         val geocoder = Geocoder(requireActivity(), Locale.getDefault())
-                        val addresses = geocoder.getFromLocation(location.latitude, location.longitude, 1)
-                        Log.d("Haibq", "moveToCurrentLocation: "+ addresses!![0].getAddressLine(0))
+                        val addresses =
+                            geocoder.getFromLocation(location.latitude, location.longitude, 1)
+                        Log.d("Haibq", "moveToCurrentLocation: " + addresses!![0].getAddressLine(0))
                         binding.tvLocation.text = addresses!![0].getAddressLine(0)
 //                        if (!addresses.isNullOrEmpty()) {
 //                            val city = addresses[0].getAddressLine(0).split(",").run {
@@ -557,7 +630,7 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
                     }
                 }
             }
-        }else{
+        } else {
             Log.d("Haibq", "moveToCurrentLocation: 1")
         }
     }
@@ -577,19 +650,19 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
         }
     }
 
-        override fun onMapReady(map: GoogleMap) {
-            this.googleMap = map
-            map.mapType = GoogleMap.MAP_TYPE_NORMAL
-            map.uiSettings.isScrollGesturesEnabled = false
-            map.uiSettings.isRotateGesturesEnabled = true
-            map.uiSettings.isZoomGesturesEnabled = false
-            map.uiSettings.isCompassEnabled = true
-            Log.d("Haibq", "onMapReady: 111")
-            moveToCurrentLocation(map)
-            map.setOnCameraIdleListener {
+    override fun onMapReady(map: GoogleMap) {
+        this.googleMap = map
+        map.mapType = GoogleMap.MAP_TYPE_NORMAL
+        map.uiSettings.isScrollGesturesEnabled = false
+        map.uiSettings.isRotateGesturesEnabled = true
+        map.uiSettings.isZoomGesturesEnabled = false
+        map.uiSettings.isCompassEnabled = true
+        Log.d("Haibq", "onMapReady: 111")
+        moveToCurrentLocation(map)
+        map.setOnCameraIdleListener {
 
-            }
         }
+    }
 
 
 }
