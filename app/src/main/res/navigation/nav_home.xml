@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_host_home"
+    app:startDestination="@id/cameraFragment">
+
+    <fragment
+        android:id="@+id/homeFragment"
+        android:name="com.tapbi.spark.gpsmappro.ui.main.home.HomeFragment"
+        android:label="HomeFragment" />
+    <fragment
+        android:id="@+id/cameraFragment"
+        android:name="com.tapbi.spark.gpsmappro.ui.main.camera.CameraFragment"
+        android:label="CameraFragment" />
+</navigation>

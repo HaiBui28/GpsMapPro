@@ -1,0 +1,54 @@
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
+buildscript {
+    ext {
+
+        agp_version = '8.4.1'
+    }
+    ext.kotlin_version = '1.6.21'
+    apply from: "dependencies.gradle"
+
+    repositories {
+        google()
+        jcenter()
+        mavenCentral()
+    }
+    dependencies {
+        classpath "com.android.tools.build:gradle:$agp_version"
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+        classpath "com.google.dagger:hilt-android-gradle-plugin:$versions.hiltVersion"
+//        classpath "com.google.gms:google-services:$versions.googleServices"
+//        classpath "com.google.firebase:firebase-crashlytics-gradle:$versions.firebaseCrashlyticGradle"
+        classpath "androidx.navigation:navigation-safe-args-gradle-plugin:$versions.androidxNavigationVersion"
+        classpath "com.google.android.libraries.mapsplatform.secrets-gradle-plugin:secrets-gradle-plugin:2.0.1"
+        classpath 'com.github.dcendents:android-maven-gradle-plugin:2.1'
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        jcenter()
+        mavenCentral()
+//        maven {
+//            url 'https://jitpack.io'
+//            credentials { username authToken }
+//        }
+        maven {
+            url 'https://android-sdk.is.com/'
+        }
+        maven {
+            url 'https://oss.sonatype.org/content/repositories/snapshots/'
+        }
+        maven {
+            url 'https://unity3ddist.jfrog.io/artifactory/unity-mediation-mvn-prod-local/'
+        }
+        maven { url "https://dl-maven-android.mintegral.com/repository/mbridge_android_sdk_oversea" }
+    }
+
+
+}
+
+
+task clean(type: Delete) {
+    delete rootProject.buildDir
+}
