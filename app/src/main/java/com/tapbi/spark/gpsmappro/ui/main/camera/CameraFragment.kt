@@ -53,6 +53,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.doOnLayout
 import androidx.core.view.drawToBitmap
+import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
@@ -69,6 +70,9 @@ import com.tapbi.spark.gpsmappro.databinding.FragmentCameraBinding
 import com.tapbi.spark.gpsmappro.ui.base.BaseBindingFragment
 import com.tapbi.spark.gpsmappro.ui.main.MainViewModel
 import com.tapbi.spark.gpsmappro.utils.afterMeasured
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.File
 import java.io.IOException
@@ -387,7 +391,7 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
         val outputOptions = ImageCapture.OutputFileOptions.Builder(file).build()
 
         animateFlash()
-        Log.d("chungvv", "imageCapture : $imageCapture")
+
         imageCapture?.takePicture(
             outputOptions,
             ContextCompat.getMainExecutor(requireContext()),
@@ -397,43 +401,46 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
                     val bitmapCamera = BitmapFactory.decodeFile(filePath)
                         .correctOrientation(filePath)
                         .let { if (isFrontCamera) it.mirrorHorizontally() else it }
+
                     val mapFragment = childFragmentManager.findFragmentById(R.id.map) as SupportMapFragment
                     mapFragment.getMapAsync { googleMap ->
                         googleMap.snapshot { mapBitmap ->
-                            if (mapBitmap!=null){
-                                // Bước 1: Thay thế map fragment bằng snapshot
-                                replaceMapFragmentWithSnapshot(mapBitmap)
+                            if (mapBitmap != null) {
+                                // 👉 Gán mapBitmap vào ImageView, ẩn fragment
+                                binding.imMapSnapshot.setImageBitmap(mapBitmap)
+                                binding.imMapSnapshot.visibility = View.VISIBLE
+                                mapFragment.requireView().visibility = View.GONE
 
-                                // Bước 2: Chờ 1 frame → rồi render llMap
-                                binding.llMap.post {
+                                // 👉 Chờ 1 frame để hệ thống render lại
+                                binding.llMap.postDelayed({
                                     val bitmapOverlay = binding.llMap.drawToBitmap()
 
-                                    // Bước 3: Gộp với ảnh từ camera
-                                    val finalBitmap = mergeBitmaps(bitmapCamera, bitmapOverlay)
+                                    // 👉 Gộp và lưu ảnh ở background
+                                    lifecycleScope.launch(Dispatchers.IO) {
+                                        val finalBitmap = mergeBitmaps(bitmapCamera, bitmapOverlay)
+                                        finalBitmap.saveToGallery(requireContext())
 
-                                    // Bước 4: Lưu ảnh
-                                    finalBitmap.saveToGallery(requireContext())
+                                        withContext(Dispatchers.Main) {
+                                            Toast.makeText(context, "Đã lưu ảnh với overlay", Toast.LENGTH_SHORT).show()
 
-                                    Toast.makeText(context, "Đã lưu ảnh với overlay", Toast.LENGTH_SHORT).show()
-                                }
+                                            // 👉 Khôi phục MapFragment sau khi chụp xong (optional)
+                                            binding.imMapSnapshot.visibility = View.GONE
+                                            mapFragment.requireView().visibility = View.VISIBLE
+                                        }
+                                    }
+                                }, 80) // delay nhỏ để đảm bảo ảnh đã render
                             }
-
                         }
                     }
-
-
                 }
 
                 override fun onError(exception: ImageCaptureException) {
-                    Toast.makeText(
-                        context,
-                        "Lỗi chụp ảnh: ${exception.message}",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    Toast.makeText(context, "Lỗi chụp ảnh: ${exception.message}", Toast.LENGTH_SHORT).show()
                 }
             }
         )
     }
+
 
     fun replaceMapFragmentWithSnapshot(mapBitmap: Bitmap) {
         val imageView = ImageView(requireContext()).apply {
