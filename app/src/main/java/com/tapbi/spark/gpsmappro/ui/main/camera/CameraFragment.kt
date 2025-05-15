@@ -15,12 +15,14 @@ import android.graphics.Matrix
 import android.location.Geocoder
 import android.media.ExifInterface
 import android.os.Bundle
+import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
 import android.util.Log
 import android.util.Size
 import android.view.MotionEvent
 import android.view.PixelCopy
+import android.view.Surface
 import android.view.View
 import android.view.ViewGroup
 import android.view.animation.DecelerateInterpolator
@@ -51,10 +53,14 @@ import androidx.camera.video.Recorder
 import androidx.camera.video.Recording
 import androidx.camera.video.VideoCapture
 import androidx.camera.video.VideoRecordEvent
+import androidx.constraintlayout.widget.ConstraintLayout
+import androidx.constraintlayout.widget.ConstraintSet
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.doOnLayout
 import androidx.core.view.drawToBitmap
+import androidx.core.view.setMargins
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
@@ -67,11 +73,19 @@ import com.google.android.gms.maps.model.MarkerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanner
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
+import com.tapbi.spark.gpsmappro.App
 import com.tapbi.spark.gpsmappro.R
 import com.tapbi.spark.gpsmappro.databinding.FragmentCameraBinding
+import com.tapbi.spark.gpsmappro.feature.BalanceBarView
+import com.tapbi.spark.gpsmappro.feature.BalanceBarView.Companion.Rotation_1
+import com.tapbi.spark.gpsmappro.feature.BalanceBarView.Companion.Rotation_2
+import com.tapbi.spark.gpsmappro.feature.BalanceBarView.Companion.Rotation_3
+import com.tapbi.spark.gpsmappro.feature.BalanceBarView.Companion.Rotation_4
 import com.tapbi.spark.gpsmappro.ui.base.BaseBindingFragment
 import com.tapbi.spark.gpsmappro.ui.main.MainViewModel
+import com.tapbi.spark.gpsmappro.utils.Utils.dpToPx
 import com.tapbi.spark.gpsmappro.utils.afterMeasured
+import com.tapbi.spark.gpsmappro.utils.clearAllConstraints
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -132,8 +146,67 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
         } else {
             requestPermissions(REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS)
         }
+        initChangeRotation()
     }
-
+    var rotation = 0f
+    val handler = Handler(Looper.getMainLooper())
+    val runnable = Runnable {
+        loadMapRotation(rotation)
+        binding.llMap.animate()
+            .rotation(rotation)
+            .setDuration(300)
+            .start()
+    }
+    private fun initChangeRotation(){
+        binding.balanceBarView.setRotationListener(object :BalanceBarView.RotationListener{
+            override fun onRotationChanged(rotation: Float) {
+                if (lifecycle.currentState == Lifecycle.State.RESUMED){
+                    Log.e("NVQ","NVQ 23456789 rotation: $rotation")
+                    this@CameraFragment.rotation = rotation
+                    handler.removeCallbacks(runnable)
+                    handler.postDelayed(runnable, 300)
+                }
+            }
+        })
+    }
+    fun loadMapRotation(rotation: Float){
+        binding.llMap.apply {
+            val m10dp = dpToPx(10)
+            val params = layoutParams as? ConstraintLayout.LayoutParams
+            params?.let {
+                it.clearAllConstraints()
+                when(rotation){
+                    Rotation_2 -> {
+                        translationX = -((binding.llMap.width/2) - (binding.llMap.height/2)).toFloat()
+                        translationY = 0f
+                        it.setMargins(m10dp)
+                        it.topToTop = binding.previewView.id
+                        it.bottomToBottom = binding.previewView.id
+                    }
+                    Rotation_3 -> {
+                        translationX = ((binding.llMap.width/2) - (binding.llMap.height/2)).toFloat()
+                        translationY = 0f
+                        it.setMargins(m10dp)
+                        it.topToTop = binding.previewView.id
+                        it.bottomToBottom = binding.previewView.id
+                    }
+                    Rotation_4 -> {
+                        translationX = 0f
+                        translationY = 0f
+                        it.setMargins(m10dp,dpToPx(10)+ App.statusBarHeight,m10dp,m10dp)
+                        params.topToTop = binding.previewView.id
+                    }
+                    else ->{
+                        translationX = 0f
+                        translationY = 0f
+                        it.setMargins(m10dp)
+                        it.bottomToBottom = binding.previewView.id
+                    }
+                }
+                layoutParams = it
+            }
+        }
+    }
     private fun initGoogleMap() {
         activity?.let {
             val mapFragment = childFragmentManager
@@ -213,7 +286,9 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
         }
 
         binding.btnVideo.setOnClickListener {
-            if (recording != null) stopRecording() else startRecording()
+//            if (recording != null) stopRecording() else startRecording()
+            binding.llMap.translationX -= 10
+            Log.e("NVQ","NVQ 123456789 ${binding.llMap.translationX}")
         }
 
         binding.btnFlash.setOnClickListener {
