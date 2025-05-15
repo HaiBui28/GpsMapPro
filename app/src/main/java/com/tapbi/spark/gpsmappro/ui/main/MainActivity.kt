@@ -24,6 +24,8 @@ class MainActivity : BaseBindingActivity<ActivityMainBinding, MainViewModel>() {
     override fun setupData() {
 
     }
-
+    companion object {
+        const val ACCESS_FINE_LOCATION_REQUEST_CODE = 100
+    }
 
 }
