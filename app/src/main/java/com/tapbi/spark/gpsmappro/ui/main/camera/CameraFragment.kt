@@ -41,6 +41,8 @@ import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.core.SurfaceOrientedMeteringPointFactory
+import androidx.camera.core.resolutionselector.AspectRatioStrategy
+import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.video.FileOutputOptions
 import androidx.camera.video.Quality
@@ -261,8 +263,15 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
 
     private fun bindCameraUseCases() {
         Log.d("chungvv", "bindCameraUseCases: ")
+
+        val aspectRatioStrategy =
+            AspectRatioStrategy(AspectRatio.RATIO_4_3, AspectRatioStrategy.FALLBACK_RULE_AUTO)
+        val resolutionSelector = ResolutionSelector.Builder()
+            .setAspectRatioStrategy(aspectRatioStrategy)
+            .build()
+
         val preview = Preview.Builder()
-            .setTargetAspectRatio(selectedAspectRatio) // AspectRatio.RATIO_4_3 hoặc RATIO_16_9
+            .setResolutionSelector(resolutionSelector)
             .build()
 
         imageCapture = ImageCapture.Builder()
