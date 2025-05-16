@@ -11,5 +11,13 @@
     <fragment
         android:id="@+id/cameraFragment"
         android:name="com.tapbi.spark.gpsmappro.ui.main.camera.CameraFragment"
-        android:label="CameraFragment" />
+        android:label="CameraFragment" >
+        <action
+            android:id="@+id/action_cameraFragment_to_googleMapFragment"
+            app:destination="@id/googleMapFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/googleMapFragment"
+        android:name="com.tapbi.spark.gpsmappro.ui.main.googlemap.GoogleMapFragment"
+        android:label="GoogleMapFragment" />
 </navigation>

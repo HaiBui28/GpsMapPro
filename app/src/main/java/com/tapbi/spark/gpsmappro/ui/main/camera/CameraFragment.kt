@@ -84,8 +84,10 @@ import com.tapbi.spark.gpsmappro.feature.BalanceBarView.Companion.Rotation_3
 import com.tapbi.spark.gpsmappro.feature.BalanceBarView.Companion.Rotation_4
 import com.tapbi.spark.gpsmappro.ui.base.BaseActivity
 import com.tapbi.spark.gpsmappro.ui.base.BaseBindingFragment
+import com.tapbi.spark.gpsmappro.ui.main.MainActivity
 import com.tapbi.spark.gpsmappro.ui.main.MainActivity.Companion.ACCESS_FINE_LOCATION_REQUEST_CODE
 import com.tapbi.spark.gpsmappro.ui.main.MainViewModel
+import com.tapbi.spark.gpsmappro.utils.MediaUtil
 import com.tapbi.spark.gpsmappro.utils.SimpleLocationManager
 import com.tapbi.spark.gpsmappro.utils.Utils.dpToPx
 import com.tapbi.spark.gpsmappro.utils.afterMeasured
@@ -161,6 +163,11 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
             requestPermissions(REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS)
         }
         initChangeRotation()
+        binding.btnMap.setOnClickListener{
+            (activity as MainActivity).navigate(R.id.action_cameraFragment_to_googleMapFragment)
+        }
+        Log.d("Haibq", "onCreatedView: "+ MediaUtil.getDevicePhotosByFolder(requireActivity()).size)
+        App.instance?.foldersMap?.addAll(MediaUtil.getDevicePhotosByFolder(requireActivity()))
     }
     fun initLocation(){
         if (simpleLocationManager == null) {
@@ -743,9 +750,7 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
     }
 
     fun moveToCurrentLocation(googleMap: GoogleMap) {
-        Log.d("Haibq", "moveToCurrentLocation: 11")
         val fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity())
-        Log.d("Haibq", "moveToCurrentLocation: 1111")
         if (ActivityCompat.checkSelfPermission(
                 requireActivity(),
                 Manifest.permission.ACCESS_FINE_LOCATION
@@ -753,14 +758,9 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
         ) {
 //            googleMap?.isMyLocationEnabled = true
             fusedLocationClient.lastLocation.addOnSuccessListener { location ->
-                Log.d("Haibq", "moveToCurrentLocation: " + (location == null))
                 if (location != null) {
                     val latLng = LatLng(location.latitude, location.longitude)
-                    Log.d(
-                        "Haibq",
-                        "moveToCurrentLocation: " + location.latitude + " " + location.longitude
-                    )
-                    googleMap?.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 16f))
+                    googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 16f))
                     googleMap.addMarker(
                         MarkerOptions()
                             .position(latLng)
@@ -770,7 +770,6 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
                         val geocoder = Geocoder(requireActivity(), Locale.getDefault())
                         val addresses =
                             geocoder.getFromLocation(location.latitude, location.longitude, 1)
-                        Log.d("Haibq", "moveToCurrentLocation: " + addresses!![0].getAddressLine(0))
                         getAddressFromLocation(location.latitude,location.longitude)
                         binding.tvLocation.text = addresses!![0].getAddressLine(0)
 //                        if (!addresses.isNullOrEmpty()) {

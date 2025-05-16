@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <Button
+        android:id="@+id/btnNormal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Normal"
+        app:layout_constraintTop_toTopOf="parent"/>
+    <Button
+        android:id="@+id/btnTerrain"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Terrain"
+        app:layout_constraintTop_toBottomOf="@+id/btnNormal" />
+    <Button
+        android:id="@+id/btnHybrid"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Hybrid"
+        app:layout_constraintTop_toBottomOf="@+id/btnTerrain" />
+    <Button
+        android:id="@+id/btnSateLLite"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Satel Lite"
+        app:layout_constraintTop_toBottomOf="@+id/btnHybrid" />
+</androidx.constraintlayout.widget.ConstraintLayout>

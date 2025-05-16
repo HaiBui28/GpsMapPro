@@ -22,7 +22,6 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
-
         <View
             android:id="@+id/focusView"
             android:layout_width="80dp"
@@ -150,5 +149,12 @@
                 android:layout_height="wrap_content" />
 
         </LinearLayout>
+        <Button
+            android:id="@+id/btnMap"
+            android:layout_width="wrap_content"
+            android:layout_height="50dp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            android:text="ohShit"/>
     </androidx.constraintlayout.widget.ConstraintLayout>
 </layout>
