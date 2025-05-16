@@ -564,11 +564,6 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
     }
 
 
-
-
-
-
-
     private fun mergeBitmaps2(cameraBitmap: Bitmap, overlayBitmap: Bitmap ,rotation : Float): Bitmap {
         val result = Bitmap.createBitmap(
             cameraBitmap.width,
@@ -592,19 +587,8 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
             newOverlayHeight,
             true
         )
-            when(rotation){
-                Rotation_2 -> {
-                }
-                Rotation_3 -> {
-
-                }
-                Rotation_4 -> {
-                }
-                else ->{
-                    val topOffset = cameraBitmap.height - newOverlayHeight - m10dp
-                    canvas.drawBitmap(scaledOverlay, dpToPx(10).toFloat(), topOffset.toFloat(), null)
-                }
-            }
+        val topOffset = cameraBitmap.height - newOverlayHeight - m10dp
+        canvas.drawBitmap(scaledOverlay, dpToPx(10).toFloat(), topOffset.toFloat(), null)
 
         return result
     }
