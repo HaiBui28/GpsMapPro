@@ -523,8 +523,8 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
 
                                     // 👉 Gộp và lưu ảnh ở background
                                     lifecycleScope.launch(Dispatchers.IO) {
-                                        val finalBitmap = mergeBitmaps(bitmapCamera, bitmapOverlay)
-                                        finalBitmap.saveToGalleryWithLocation(requireContext(),simpleLocationManager?.getLocation())
+                                        val finalBitmap = mergeBitmaps(bitmapCamera, bitmapOverlay, rotation)
+                                        finalBitmap.saveToGalleryWithLocation(requireContext(),simpleLocationManager?.getLocation(),rotation )
 
                                         withContext(Dispatchers.Main) {
                                             Toast.makeText(context, "Đã lưu ảnh với overlay", Toast.LENGTH_SHORT).show()
@@ -569,7 +569,7 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
 
 
 
-    private fun mergeBitmaps(cameraBitmap: Bitmap, overlayBitmap: Bitmap): Bitmap {
+    private fun mergeBitmaps2(cameraBitmap: Bitmap, overlayBitmap: Bitmap ,rotation : Float): Bitmap {
         val result = Bitmap.createBitmap(
             cameraBitmap.width,
             cameraBitmap.height,
@@ -577,18 +577,101 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
         )
         val canvas = Canvas(result)
         canvas.drawBitmap(cameraBitmap, 0f, 0f, null)
+        val m10dp = dpToPx(10)
 
-        // Scale overlay nếu cần cho vừa khung
+        // ✅ Sử dụng Float để tránh chia lấy phần nguyên
+        val availableWidth = cameraBitmap.width - 2*m10dp
+        val scale = availableWidth.toFloat() / overlayBitmap.width.toFloat()
+
+        val newOverlayWidth = (overlayBitmap.width * scale).toInt()
+        val newOverlayHeight = (overlayBitmap.height * scale).toInt()
+
         val scaledOverlay = Bitmap.createScaledBitmap(
             overlayBitmap,
+            newOverlayWidth,
+            newOverlayHeight,
+            true
+        )
+            when(rotation){
+                Rotation_2 -> {
+                }
+                Rotation_3 -> {
+
+                }
+                Rotation_4 -> {
+                }
+                else ->{
+                    val topOffset = cameraBitmap.height - newOverlayHeight - m10dp
+                    canvas.drawBitmap(scaledOverlay, dpToPx(10).toFloat(), topOffset.toFloat(), null)
+                }
+            }
+
+        return result
+    }
+
+    private fun mergeBitmaps(cameraBitmap: Bitmap, overlayBitmap: Bitmap, rotation: Float): Bitmap {
+        val result = Bitmap.createBitmap(
             cameraBitmap.width,
-            overlayBitmap.height * cameraBitmap.width / overlayBitmap.width,
+            cameraBitmap.height,
+            cameraBitmap.config
+        )
+        val canvas = Canvas(result)
+        canvas.drawBitmap(cameraBitmap, 0f, 0f, null)
+        val margin = dpToPx(10).toFloat()
+
+        // Scale overlay cho vừa chiều rộng
+        val availableWidth = cameraBitmap.width - 2 * margin
+        val scale = availableWidth / overlayBitmap.width.toFloat()
+
+        val newOverlayWidth = (overlayBitmap.width * scale).toInt()
+        val newOverlayHeight = (overlayBitmap.height * scale).toInt()
+
+        val scaledOverlay = Bitmap.createScaledBitmap(
+            overlayBitmap,
+            newOverlayWidth,
+            newOverlayHeight,
             true
         )
 
-        // Gắn overlay xuống dưới cùng
-        val topOffset = cameraBitmap.height - scaledOverlay.height
-        canvas.drawBitmap(scaledOverlay, 0f, topOffset.toFloat(), null)
+        // Tạo matrix xoay quanh tâm ảnh overlay
+        val matrix = Matrix()
+        matrix.postScale(1f, 1f) // scale giữ nguyên
+        matrix.postRotate(rotation, newOverlayWidth / 2f, newOverlayHeight / 2f)
+
+        val rotatedOverlay = Bitmap.createBitmap(
+            scaledOverlay,
+            0,
+            0,
+            newOverlayWidth,
+            newOverlayHeight,
+            matrix,
+            true
+        )
+
+        // Vẽ rotatedOverlay vào vị trí thích hợp
+        val left : Float
+        val top : Float
+        when(rotation){
+            Rotation_2 -> {
+                left = margin
+                top = cameraBitmap.height.toFloat()/2 - rotatedOverlay.height.toFloat()/2
+            }
+            Rotation_3 -> {
+                left = cameraBitmap.width.toFloat() - rotatedOverlay.width.toFloat() - margin
+                top = cameraBitmap.height.toFloat()/2 - rotatedOverlay.height.toFloat()/2
+            }
+            Rotation_4 -> {
+                left = margin
+                top = margin
+            }
+            else ->{
+                left = margin
+                top = cameraBitmap.height - rotatedOverlay.height - margin
+            }
+        }
+
+
+        canvas.drawBitmap(rotatedOverlay, left, top, null)
 
         return result
     }

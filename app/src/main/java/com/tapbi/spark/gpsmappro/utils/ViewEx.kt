@@ -10,6 +10,7 @@ import android.location.Location
 import android.os.Build
 import android.provider.MediaStore
 import android.service.credentials.PermissionUtils.hasPermission
+import android.util.Log
 import android.view.View
 import android.view.ViewTreeObserver
 import androidx.annotation.ChecksSdkIntAtLeast
@@ -18,6 +19,7 @@ import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.exifinterface.media.ExifInterface
+import timber.log.Timber
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -76,23 +78,26 @@ fun Bitmap.saveToGallery(context: Context) {
         }
     }
 }
-fun Bitmap.saveToGalleryWithLocation(context: Context, location: Location?) {
+fun Bitmap.saveToGalleryWithLocation(context: Context, location: Location?, rotation: Float) {
     val filename = "mirrored_${System.currentTimeMillis()}.jpg"
 
-    // 1. Tạo file tạm trong bộ nhớ cache
+    val matrix = Matrix().apply { postRotate(-rotation) }
+    // 1. Xoay ảnh nếu cần
+    val finalBitmap = Bitmap.createBitmap(this, 0, 0, width, height, matrix, true)
+    // 2. Tạo file tạm trong bộ nhớ cache
     val tempFile = File.createTempFile("temp_image", ".jpg", context.cacheDir)
     FileOutputStream(tempFile).use { out ->
-        compress(Bitmap.CompressFormat.JPEG, 100, out)
+        finalBitmap.compress(Bitmap.CompressFormat.JPEG, 100, out)
     }
 
-    // 2. Ghi vị trí vào EXIF nếu có
+    // 3. Ghi vị trí vào EXIF nếu có
     location?.let {
         val exif = ExifInterface(tempFile.absolutePath)
         exif.setGpsInfo(it)
         exif.saveAttributes()
     }
 
-    // 3. Ghi vào MediaStore
+    // 4. Ghi vào MediaStore
     val contentValues = ContentValues().apply {
         put(MediaStore.Images.Media.DISPLAY_NAME, filename)
         put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
@@ -106,10 +111,11 @@ fun Bitmap.saveToGalleryWithLocation(context: Context, location: Location?) {
 
     uri?.let {
         context.contentResolver.openOutputStream(it)?.use { out ->
-            FileInputStream(tempFile).copyTo(out) // copy từ file tạm đã có EXIF
+            FileInputStream(tempFile).copyTo(out)
         }
     }
 
-    // 4. Xoá file tạm nếu muốn
+    // 5. Xoá file tạm
     tempFile.delete()
 }
+
