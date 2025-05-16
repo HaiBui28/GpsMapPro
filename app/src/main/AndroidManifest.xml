@@ -29,7 +29,8 @@
             android:value="AIzaSyCrmyjzXjx4OoJmzeUrjNX-kAfACod3U44" />
         <activity
             android:name=".ui.main.MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:screenOrientation="portrait">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 

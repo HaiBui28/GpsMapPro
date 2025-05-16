@@ -684,7 +684,7 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
                 Manifest.permission.ACCESS_FINE_LOCATION
             ) == PackageManager.PERMISSION_GRANTED
         ) {
-            googleMap?.isMyLocationEnabled = true
+//            googleMap?.isMyLocationEnabled = true
             fusedLocationClient.lastLocation.addOnSuccessListener { location ->
                 Log.d("Haibq", "moveToCurrentLocation: " + (location == null))
                 if (location != null) {
@@ -759,11 +759,14 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
 
     override fun onMapReady(map: GoogleMap) {
         this.googleMap = map
-        map.mapType = GoogleMap.MAP_TYPE_NORMAL
+        map.mapType = GoogleMap.MAP_TYPE_HYBRID
         map.uiSettings.isScrollGesturesEnabled = false
-        map.uiSettings.isRotateGesturesEnabled = true
+        map.uiSettings.isRotateGesturesEnabled = false
         map.uiSettings.isZoomGesturesEnabled = false
-        map.uiSettings.isCompassEnabled = true
+        map.uiSettings.isMyLocationButtonEnabled = false
+        map.uiSettings.isCompassEnabled = false
+        val zoomLevel = 5f
+        map.moveCamera(CameraUpdateFactory.zoomTo(zoomLevel))
         Log.d("Haibq", "onMapReady: 111")
         moveToCurrentLocation(map)
         map.setOnCameraIdleListener {

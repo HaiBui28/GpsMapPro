@@ -44,6 +44,8 @@
             android:id="@+id/llMap"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintBottom_toBottomOf="@+id/previewView"
             android:layout_margin="10dp">
 
