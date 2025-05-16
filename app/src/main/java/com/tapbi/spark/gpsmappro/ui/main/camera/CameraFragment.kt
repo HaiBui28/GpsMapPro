@@ -84,6 +84,7 @@ import com.tapbi.spark.gpsmappro.feature.BalanceBarView.Companion.Rotation_3
 import com.tapbi.spark.gpsmappro.feature.BalanceBarView.Companion.Rotation_4
 import com.tapbi.spark.gpsmappro.ui.base.BaseActivity
 import com.tapbi.spark.gpsmappro.ui.base.BaseBindingFragment
+import com.tapbi.spark.gpsmappro.ui.custom.CustomLocationImage
 import com.tapbi.spark.gpsmappro.ui.main.MainActivity
 import com.tapbi.spark.gpsmappro.ui.main.MainActivity.Companion.ACCESS_FINE_LOCATION_REQUEST_CODE
 import com.tapbi.spark.gpsmappro.ui.main.MainViewModel
@@ -152,6 +153,7 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
 
     override fun onCreatedView(view: View?, savedInstanceState: Bundle?) {
         initGoogleMap()
+        binding.customImahe.setWidthHeight(300,300)
         barcodeScanner = BarcodeScanning.getClient()
 
         cameraExecutor = Executors.newSingleThreadExecutor()
@@ -166,8 +168,8 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
         binding.btnMap.setOnClickListener{
             (activity as MainActivity).navigate(R.id.action_cameraFragment_to_googleMapFragment)
         }
-        Log.d("Haibq", "onCreatedView: "+ MediaUtil.getDevicePhotosByFolder(requireActivity()).size)
-        App.instance?.foldersMap?.addAll(MediaUtil.getDevicePhotosByFolder(requireActivity()))
+//        Log.d("Haibq", "onCreatedView: "+ MediaUtil.getDevicePhotosByFolder(requireActivity()).size)
+//        App.instance?.foldersMap?.addAll(MediaUtil.getDevicePhotosByFolder(requireActivity()))
     }
     fun initLocation(){
         if (simpleLocationManager == null) {
