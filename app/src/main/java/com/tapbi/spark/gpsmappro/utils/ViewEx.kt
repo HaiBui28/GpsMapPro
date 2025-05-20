@@ -117,4 +117,21 @@ fun Bitmap.saveToGalleryWithLocation(context: Context, location: Location?, rota
     // 5. Xoá file tạm
     tempFile.delete()
 }
+fun Bitmap.correctOrientation(filePath: String): Bitmap {
+    val exif = android.media.ExifInterface(filePath)
+    val orientation = exif.getAttributeInt(
+        android.media.ExifInterface.TAG_ORIENTATION,
+        android.media.ExifInterface.ORIENTATION_NORMAL
+    )
+
+    val matrix = Matrix()
+
+    when (orientation) {
+        android.media.ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
+        android.media.ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
+        android.media.ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
+    }
+
+    return Bitmap.createBitmap(this, 0, 0, width, height, matrix, true)
+}
 
