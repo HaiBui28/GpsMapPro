@@ -129,11 +129,13 @@ dependencies {
     implementation "androidx.camera:camera-view:$camerax_version"
 //    implementation project(":flagkit")
     implementation project(":gpuv")
+    implementation project(":library")
 
 
     dependencies {
         implementation 'com.google.mlkit:barcode-scanning:17.0.1'
     }
+
 
 
 }

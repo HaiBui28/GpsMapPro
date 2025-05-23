@@ -15,13 +15,13 @@ import android.media.MediaRecorder
 import android.media.MediaScannerConnection
 import android.os.Bundle
 import android.os.Environment
-import android.util.Log
 import android.util.Size
 import android.view.Surface
 import android.view.View
 import android.widget.Toast
 import androidx.camera.core.AspectRatio
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
@@ -32,6 +32,9 @@ import com.tapbi.spark.gpsmappro.R
 import com.tapbi.spark.gpsmappro.databinding.FragmentCamera3Binding
 import com.tapbi.spark.gpsmappro.ui.base.BaseBindingFragment
 import com.tapbi.spark.gpsmappro.ui.main.MainViewModel
+import com.tapbi.spark.gpsmappro.utils.YuvToRgbConverter
+import jp.co.cyberagent.android.gpuimage.GPUImage
+import jp.co.cyberagent.android.gpuimage.filter.GPUImageColorInvertFilter
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -54,7 +57,9 @@ class Camera3Fragment : BaseBindingFragment<FragmentCamera3Binding, MainViewMode
     private var imageAnalysis: ImageAnalysis? = null
 
     val aspectRatio = AspectRatio.RATIO_16_9
-    private var videoOutputFile: File? = null
+
+    private var bitmap: Bitmap? = null
+    private lateinit var converter: YuvToRgbConverter
 
 
     companion object {
@@ -72,7 +77,7 @@ class Camera3Fragment : BaseBindingFragment<FragmentCamera3Binding, MainViewMode
 
     override fun onCreatedView(view: View?, savedInstanceState: Bundle?) {
         cameraExecutor = Executors.newSingleThreadExecutor()
-
+        converter = YuvToRgbConverter(requireContext())
         overlayBitmap = Bitmap.createBitmap(200, 200, Bitmap.Config.ARGB_8888).apply {
             val canvas = Canvas(this)
             val paint = android.graphics.Paint()
@@ -100,62 +105,76 @@ class Camera3Fragment : BaseBindingFragment<FragmentCamera3Binding, MainViewMode
         }
     }
 
-    var lastFrameTimestamp = 0L
+
+    @ExperimentalGetImage
     private fun startCamera() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(requireContext())
+
         cameraProviderFuture.addListener({
             val cameraProvider = cameraProviderFuture.get()
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
-            val preview = Preview.Builder().setTargetAspectRatio(aspectRatio)
-                .build()
-                .also {
-                    it.setSurfaceProvider(binding.viewFinder.surfaceProvider)
-                }
+
             imageAnalysis = ImageAnalysis.Builder()
-                // Không set target resolution để lấy mặc định
                 .setTargetAspectRatio(aspectRatio)
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .build()
 
-            imageAnalysis!!.setAnalyzer(cameraExecutor) { imageProxy ->
-                Log.d("chungvv", "setAnalyzer: ")
-                val currentTimestamp = System.nanoTime()
-
-                if (!isEncoderInitialized && isRecording) {
-                    // Lấy kích thước chưa xoay
-                    val rawWidth = imageProxy.width
-                    val rawHeight = imageProxy.height
-                    val rotationDegrees = imageProxy.imageInfo.rotationDegrees
-
-                    // Xác định kích thước sau xoay (video cần đúng orientation)
-                    val (videoWidth, videoHeight) = if (rotationDegrees == 90 || rotationDegrees == 270) {
-                        rawHeight to rawWidth // đổi chiều khi xoay 90 hoặc 270 độ
-                    } else {
-                        rawWidth to rawHeight
-                    }
-
-                    val videoOutputFile = File(
-                        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM),
-                        "VID_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())}.mp4"
-                    )
-
-                    // Khởi tạo VideoEncoder với kích thước sau xoay
-                    videoEncoder = VideoEncoder(videoWidth, videoHeight, videoOutputFile)
-                    videoEncoder?.startAudioRecording()
-                    isEncoderInitialized = true
+            imageAnalysis?.setAnalyzer(cameraExecutor) { imageProxy ->
+                val image = imageProxy.image
+                if (image == null) {
+                    imageProxy.close()
+                    return@setAnalyzer
                 }
 
-                if (isRecording && isEncoderReleased && isEncoderInitialized) {
-                    processImage(imageProxy)
-                } else {
+                val rotationDegrees = imageProxy.imageInfo.rotationDegrees
+                var bitmap = allocateBitmapIfNecessary(imageProxy.width, imageProxy.height)
+                converter.yuvToRgb(image, bitmap)
+                bitmap = bitmap.rotate(rotationDegrees)
+
+                binding.gpuImageView.post {
+                    binding.gpuImageView.setImage(bitmap)
+                    binding.gpuImageView.filter = GPUImageColorInvertFilter()
+
+                    if (isRecording) {
+                        if (!isEncoderInitialized) {
+                            val (videoWidth, videoHeight) = if (rotationDegrees == 90 || rotationDegrees == 270) {
+                                imageProxy.height to imageProxy.width
+                            } else {
+                                imageProxy.width to imageProxy.height
+                            }
+
+                            val videoOutputFile = File(
+                                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM),
+                                "VID_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())}.mp4"
+                            )
+
+                            videoEncoder = VideoEncoder(videoWidth, videoHeight, videoOutputFile).apply {
+                                startAudioRecording()
+                            }
+                            isEncoderInitialized = true
+                        }
+
+                        if (isEncoderReleased && isEncoderInitialized) {
+                            processImage(imageProxy, bitmap)
+                            return@post // giữ imageProxy không bị close ở đây nếu dùng processImage bất đồng bộ
+                        }
+                    }
+
                     imageProxy.close()
                 }
             }
 
-
             cameraProvider.unbindAll()
-            cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageAnalysis)
+            cameraProvider.bindToLifecycle(viewLifecycleOwner, cameraSelector, imageAnalysis)
         }, ContextCompat.getMainExecutor(requireContext()))
+    }
+
+
+    private fun allocateBitmapIfNecessary(width: Int, height: Int): Bitmap {
+        if (bitmap == null || bitmap!!.width != width || bitmap!!.height != height) {
+            bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        }
+        return bitmap!!
     }
 
     private fun getSupportedResolutions(cameraSelector: CameraSelector): List<Size> {
@@ -240,15 +259,15 @@ class Camera3Fragment : BaseBindingFragment<FragmentCamera3Binding, MainViewMode
         )
     }
 
-    private fun processImage(imageProxy: ImageProxy) {
-        val rotationDegrees = imageProxy.imageInfo.rotationDegrees
-        val cameraBitmap = imageProxy.toBitmap().rotate(rotationDegrees) // hàm rotate bitmap
-
+    private fun processImage(imageProxy: ImageProxy, cameraBitmap: Bitmap) {
+        val gpuImage = GPUImage(requireContext())
+        gpuImage.setImage(cameraBitmap)
+        gpuImage.setFilter(GPUImageColorInvertFilter())
+        val filteredBitmap = gpuImage.bitmapWithFilterApplied
         videoEncoder?.let {
-            drawBitmapToSurface(it.inputSurface, cameraBitmap, overlayBitmap)
+            drawBitmapToSurface(it.inputSurface, filteredBitmap, overlayBitmap)
             it.drainVideoEncoder()
         }
-
         imageProxy.close()
     }
 
@@ -258,15 +277,12 @@ class Camera3Fragment : BaseBindingFragment<FragmentCamera3Binding, MainViewMode
         return Bitmap.createBitmap(this, 0, 0, width, height, matrix, true)
     }
 
+
     private fun drawBitmapToSurface(surface: Surface, cameraFrame: Bitmap, overlay: Bitmap) {
         try {
-            Log.d("chungvv", "drawBitmapToSurface: ")
             val canvas = surface.lockCanvas(null)
-
-            // Vẽ camera frame trước (làm nền)
             canvas.drawBitmap(cameraFrame, null, Rect(0, 0, canvas.width, canvas.height), null)
 
-            // Vẽ overlay lên trên
             val overlaySize = 200
             val left = (canvas.width - overlaySize) / 2
             val top = (canvas.height - overlaySize) / 2
