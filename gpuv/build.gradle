@@ -1,0 +1,28 @@
+apply plugin: 'com.android.library'
+
+android {
+    compileSdkVersion 33
+    namespace 'com.daasuu.gpuv'
+    defaultConfig {
+        minSdkVersion 21
+        targetSdkVersion 33
+        versionCode 1
+        versionName "0.1.1"
+
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+
+}
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+
+    compileOnly "com.google.android.exoplayer:exoplayer-core:2.18.2"
+
+}

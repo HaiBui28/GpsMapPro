@@ -9,7 +9,7 @@ import android.graphics.Matrix
 import android.location.Location
 import android.os.Build
 import android.provider.MediaStore
-import android.service.credentials.PermissionUtils.hasPermission
+//import android.service.credentials.PermissionUtils.hasPermission
 import android.util.Log
 import android.view.View
 import android.view.ViewTreeObserver

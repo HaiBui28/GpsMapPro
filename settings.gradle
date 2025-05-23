@@ -1,4 +1,4 @@
 
 rootProject.name = "GpsMapPro"
 include ':app'
-include ':flagkit'
+include ':gpuv'
