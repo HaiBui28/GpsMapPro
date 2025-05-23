@@ -5,43 +5,66 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.graphics.ImageFormat
 import android.graphics.Matrix
 import android.graphics.Rect
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
+import android.location.Geocoder
 import android.media.MediaRecorder
 import android.media.MediaScannerConnection
 import android.os.Bundle
 import android.os.Environment
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.util.Size
 import android.view.Surface
 import android.view.View
 import android.widget.Toast
 import androidx.camera.core.AspectRatio
+import androidx.camera.core.AspectRatio.RATIO_DEFAULT
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.view.drawToBitmap
+import androidx.core.view.setMargins
+import androidx.lifecycle.Lifecycle
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.GoogleMap
+import com.google.android.gms.maps.OnMapReadyCallback
+import com.google.android.gms.maps.SupportMapFragment
+import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.MarkerOptions
+import com.tapbi.spark.gpsmappro.App
 import com.tapbi.spark.gpsmappro.R
 import com.tapbi.spark.gpsmappro.databinding.FragmentCamera3Binding
+import com.tapbi.spark.gpsmappro.feature.BalanceBarView
+import com.tapbi.spark.gpsmappro.feature.BalanceBarView.Companion.Rotation_2
+import com.tapbi.spark.gpsmappro.feature.BalanceBarView.Companion.Rotation_3
+import com.tapbi.spark.gpsmappro.feature.BalanceBarView.Companion.Rotation_4
 import com.tapbi.spark.gpsmappro.ui.base.BaseBindingFragment
 import com.tapbi.spark.gpsmappro.ui.main.MainViewModel
+import com.tapbi.spark.gpsmappro.utils.Utils.dpToPx
+import com.tapbi.spark.gpsmappro.utils.clearAllConstraints
+import timber.log.Timber
 import java.io.File
+import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
-class Camera3Fragment : BaseBindingFragment<FragmentCamera3Binding, MainViewModel>() {
-
-
+class Camera3Fragment : BaseBindingFragment<FragmentCamera3Binding, MainViewModel>(),
+    OnMapReadyCallback  {
+    private var googleMap: GoogleMap? = null
     private lateinit var cameraExecutor: ExecutorService
 
     private var videoEncoder: VideoEncoder? = null
@@ -55,6 +78,53 @@ class Camera3Fragment : BaseBindingFragment<FragmentCamera3Binding, MainViewMode
 
     val aspectRatio = AspectRatio.RATIO_16_9
     private var videoOutputFile: File? = null
+    var rotation = 0f
+    val handler = Handler(Looper.getMainLooper())
+    val runnable = Runnable {
+        loadMapRotation(rotation)
+        binding.llMap.animate()
+            .rotation(rotation)
+            .setDuration(300)
+            .start()
+    }
+    fun loadMapRotation(rotation: Float){
+        binding.llMap.apply {
+            val m10dp = dpToPx(10)
+            val params = layoutParams as? ConstraintLayout.LayoutParams
+            params?.let {
+                it.clearAllConstraints()
+                when(rotation){
+                    Rotation_2 -> {
+                        translationX = -((binding.llMap.width/2) - (binding.llMap.height/2)).toFloat()
+                        translationY = 0f
+                        it.setMargins(m10dp)
+                        it.topToTop = binding.viewFinder.id
+                        it.bottomToBottom = binding.viewFinder.id
+                    }
+                    Rotation_3 -> {
+                        translationX = ((binding.llMap.width/2) - (binding.llMap.height/2)).toFloat()
+                        translationY = 0f
+                        it.setMargins(m10dp)
+                        it.topToTop = binding.viewFinder.id
+                        it.bottomToBottom = binding.viewFinder.id
+                    }
+                    Rotation_4 -> {
+                        translationX = 0f
+                        translationY = 0f
+                        it.setMargins(m10dp,dpToPx(10)+ App.statusBarHeight,m10dp,m10dp)
+                        params.topToTop = binding.viewFinder.id
+                    }
+                    else ->{
+                        translationX = 0f
+                        translationY = 0f
+                        it.setMargins(m10dp)
+                        it.bottomToBottom = binding.viewFinder.id
+                    }
+                }
+                layoutParams = it
+            }
+        }
+    }
 
 
     companion object {
@@ -71,16 +141,9 @@ class Camera3Fragment : BaseBindingFragment<FragmentCamera3Binding, MainViewMode
         get() = R.layout.fragment_camera_3
 
     override fun onCreatedView(view: View?, savedInstanceState: Bundle?) {
+        initGoogleMap()
         cameraExecutor = Executors.newSingleThreadExecutor()
-
-        overlayBitmap = Bitmap.createBitmap(200, 200, Bitmap.Config.ARGB_8888).apply {
-            val canvas = Canvas(this)
-            val paint = android.graphics.Paint()
-            paint.color = android.graphics.Color.RED
-            paint.style = android.graphics.Paint.Style.FILL
-            canvas.drawCircle(100f, 100f, 100f, paint)
-        }
-
+        initChangeRotation()
         if (allPermissionsGranted()) {
             startCamera()
         } else {
@@ -98,6 +161,18 @@ class Camera3Fragment : BaseBindingFragment<FragmentCamera3Binding, MainViewMode
         binding.btnStop.setOnClickListener {
             stopRecording()
         }
+    }
+    private fun initChangeRotation(){
+        binding.balanceBarView.setRotationListener(object :BalanceBarView.RotationListener{
+            override fun onRotationChanged(rotation: Float) {
+                if (lifecycle.currentState == Lifecycle.State.RESUMED){
+                    Log.e("NVQ","NVQ 23456789 rotation: $rotation")
+                    this@Camera3Fragment.rotation = rotation
+                    handler.removeCallbacks(runnable)
+                    handler.postDelayed(runnable, 300)
+                }
+            }
+        })
     }
 
     var lastFrameTimestamp = 0L
@@ -138,6 +213,7 @@ class Camera3Fragment : BaseBindingFragment<FragmentCamera3Binding, MainViewMode
                         Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM),
                         "VID_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())}.mp4"
                     )
+                    Log.e("NVQ","123456852 ${videoWidth} // ${videoHeight}")
 
                     // Khởi tạo VideoEncoder với kích thước sau xoay
                     videoEncoder = VideoEncoder(videoWidth, videoHeight, videoOutputFile)
@@ -262,26 +338,54 @@ class Camera3Fragment : BaseBindingFragment<FragmentCamera3Binding, MainViewMode
         try {
             Log.d("chungvv", "drawBitmapToSurface: ")
             val canvas = surface.lockCanvas(null)
-
             // Vẽ camera frame trước (làm nền)
             canvas.drawBitmap(cameraFrame, null, Rect(0, 0, canvas.width, canvas.height), null)
-
-            // Vẽ overlay lên trên
-            val overlaySize = 200
-            val left = (canvas.width - overlaySize) / 2
-            val top = (canvas.height - overlaySize) / 2
+            val margin = dpToPx(10)
+            val scale = (canvas.width.toFloat() - 2*margin)/overlay.width.toFloat()
+            var left = 0
+            var top = 0
+            val w =(overlay.width*scale).toInt()
+            val h =(overlay.height*scale).toInt()
+            var rotatedOverlay = overlay
+            when (rotation) {
+                Rotation_2 -> {
+                    rotatedOverlay = rotateBitmap(overlay, 90f)
+                    left = margin
+                    top = (canvas.height - w)/2
+                }
+                Rotation_3 -> {
+                    rotatedOverlay = rotateBitmap(overlay, -90f)
+                    left = canvas.width - margin - h
+                    top = (canvas.height - w)/2
+                }
+                Rotation_4 -> {
+                    rotatedOverlay = rotateBitmap(overlay, 180f)
+                    left = margin
+                    top = margin
+                }
+                else -> {
+                    left = margin
+                    top = canvas.height - h - margin
+                }
+            }
             canvas.drawBitmap(
-                overlay,
+                rotatedOverlay,
                 null,
-                Rect(left, top, left + overlaySize, top + overlaySize),
+                Rect(left, top, left + if (rotation in listOf(Rotation_2, Rotation_3)) h else w
+                    , top + if (rotation in listOf(Rotation_2, Rotation_3)) w else h),
                 null
             )
-
             surface.unlockCanvasAndPost(canvas)
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
+    private fun rotateBitmap(source: Bitmap, angle: Float): Bitmap {
+        val matrix = Matrix()
+        matrix.postRotate(angle)
+        return Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true)
+    }
+
 
     private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
         ContextCompat.checkSelfPermission(requireContext(), it) == PackageManager.PERMISSION_GRANTED
@@ -307,6 +411,32 @@ class Camera3Fragment : BaseBindingFragment<FragmentCamera3Binding, MainViewMode
             videoEncoder?.stop()
         }
     }
+    private fun initGoogleMap() {
+        activity?.let {
+            val mapFragment = childFragmentManager
+                .findFragmentById(R.id.map) as SupportMapFragment?
+            mapFragment?.getMapAsync(this)
+        }
+    }
+
+    fun loadBitmapLocation(){
+        val mapFragment = childFragmentManager.findFragmentById(R.id.map) as SupportMapFragment
+        mapFragment.getMapAsync { googleMap ->
+            googleMap.snapshot { mapBitmap ->
+                if (mapBitmap != null) {
+                    // 👉 Gán mapBitmap vào ImageView, ẩn fragment
+                    binding.imMapSnapshot.setImageBitmap(mapBitmap)
+                    binding.imMapSnapshot.visibility = View.VISIBLE
+                    mapFragment.requireView().visibility = View.GONE
+
+                    // 👉 Chờ 1 frame để hệ thống render lại
+                    binding.llMap.postDelayed({
+                        overlayBitmap = binding.llMap.drawToBitmap()
+                    }, 80) // delay nhỏ để đảm bảo ảnh đã render
+                }
+            }
+        }
+    }
 
     override fun onPermissionGranted() {
 
@@ -318,5 +448,81 @@ class Camera3Fragment : BaseBindingFragment<FragmentCamera3Binding, MainViewMode
 
     override fun onBackPressed() {
 
+    }
+
+    override fun onMapReady(map: GoogleMap) {
+        this.googleMap = map
+        map.mapType = GoogleMap.MAP_TYPE_HYBRID
+        map.uiSettings.isScrollGesturesEnabled = false
+        map.uiSettings.isRotateGesturesEnabled = false
+        map.uiSettings.isZoomGesturesEnabled = false
+        map.uiSettings.isMyLocationButtonEnabled = false
+        map.uiSettings.isCompassEnabled = false
+        val zoomLevel = 5f
+        map.moveCamera(CameraUpdateFactory.zoomTo(zoomLevel))
+        Log.d("Haibq", "onMapReady: 111")
+        moveToCurrentLocation(map)
+        map.setOnCameraIdleListener {
+        }
+        loadBitmapLocation()
+    }
+    fun moveToCurrentLocation(googleMap: GoogleMap) {
+        val fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity())
+        if (ActivityCompat.checkSelfPermission(
+                requireActivity(),
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+//            googleMap?.isMyLocationEnabled = true
+            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                if (location != null) {
+                    val latLng = LatLng(location.latitude, location.longitude)
+                    googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 16f))
+                    googleMap.addMarker(
+                        MarkerOptions()
+                            .position(latLng)
+                            .title("Vị trí mặc định")
+                    )
+                    try {
+                        val geocoder = Geocoder(requireActivity(), Locale.getDefault())
+                        val addresses =
+                            geocoder.getFromLocation(location.latitude, location.longitude, 1)
+                        getAddressFromLocation(location.latitude,location.longitude)
+                        binding.tvLocation.text = addresses!![0].getAddressLine(0)
+//                        if (!addresses.isNullOrEmpty()) {
+//                            val city = addresses[0].getAddressLine(0).split(",").run {
+//                                if (size >= 2) this[size - 2] else this[0]
+//                            }.trim { it <= ' ' }
+//                            val cityCut = getFormattedCityName(city)
+//                            Hawk.put(Constant.CURRENT_CITY, cityCut)
+//                            getWeather(context, isLoadCity, cityCut, dataWeather)
+//                        }
+                    } catch (e: IOException) {
+                        e.printStackTrace()
+                    }
+                }
+            }
+        } else {
+            Log.d("Haibq", "moveToCurrentLocation: 1")
+        }
+    }
+    fun getAddressFromLocation(lat: Double, lon: Double) {
+        val geocoder = Geocoder(requireContext(), Locale.getDefault())
+        try {
+            val addresses = geocoder.getFromLocation(lat, lon, 1)
+            if (!addresses.isNullOrEmpty()) {
+                val address = addresses[0]
+                val fullAddress = address.getAddressLine(0) // địa chỉ đầy đủ
+                val street = address.thoroughfare            // tên đường
+                val district = address.subLocality           // phường
+                val city = address.locality                  // thành phố
+                val province = address.adminArea             // tỉnh/thành
+                val country = address.countryName            // quốc gia
+
+                Log.d("Haibq", "Địa chỉ: $fullAddress")
+            }
+        } catch (e: IOException) {
+            e.printStackTrace()
+        }
     }
 }

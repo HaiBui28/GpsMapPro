@@ -5,7 +5,10 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Matrix
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
 import android.location.Location
 import android.os.Build
 import android.provider.MediaStore
@@ -135,4 +138,28 @@ fun Bitmap.correctOrientation(filePath: String): Bitmap {
 
     return Bitmap.createBitmap(this, 0, 0, width, height, matrix, true)
 }
+fun Drawable.toBitmap(): Bitmap {
+    if (this is BitmapDrawable) {
+        return bitmap
+    }
+
+    val width = intrinsicWidth.takeIf { it > 0 } ?: 1
+    val height = intrinsicHeight.takeIf { it > 0 } ?: 1
+    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    setBounds(0, 0, canvas.width, canvas.height)
+    draw(canvas)
+    return bitmap
+}
+fun viewToBitmap(view: View): Bitmap {
+    val bitmap = Bitmap.createBitmap(
+        view.width,
+        view.height,
+        Bitmap.Config.ARGB_8888
+    )
+    val canvas = Canvas(bitmap)
+    view.draw(canvas)
+    return bitmap
+}
+
 

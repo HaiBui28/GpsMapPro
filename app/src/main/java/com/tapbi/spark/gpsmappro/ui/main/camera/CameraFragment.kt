@@ -755,7 +755,6 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
         Log.d("Haibq", "onMapReady: 111")
         moveToCurrentLocation(map)
         map.setOnCameraIdleListener {
-
         }
     }
 
