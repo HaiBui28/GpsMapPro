@@ -77,6 +77,8 @@ class Camera3Fragment : BaseBindingFragment<FragmentCamera3Binding, MainViewMode
 
     private var imageAnalysis: ImageAnalysis? = null
 
+    private lateinit var gpuImage: GPUImage
+
     val aspectRatio = AspectRatio.RATIO_16_9
     private var videoOutputFile: File? = null
     var rotation = 0f
@@ -151,7 +153,7 @@ class Camera3Fragment : BaseBindingFragment<FragmentCamera3Binding, MainViewMode
         initGoogleMap()
         cameraExecutor = Executors.newSingleThreadExecutor()
         initChangeRotation()
-
+        gpuImage = GPUImage(requireContext())
         converter = YuvToRgbConverter(requireContext())
         if (allPermissionsGranted()) {
             startCamera()
@@ -335,7 +337,6 @@ class Camera3Fragment : BaseBindingFragment<FragmentCamera3Binding, MainViewMode
     }
 
     private fun processImage(imageProxy: ImageProxy, cameraBitmap: Bitmap) {
-        val gpuImage = GPUImage(requireContext())
         gpuImage.setImage(cameraBitmap)
         gpuImage.setFilter(GPUImageColorInvertFilter())
         val filteredBitmap = gpuImage.bitmapWithFilterApplied
