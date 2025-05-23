@@ -5,6 +5,7 @@ import android.view.View
 import com.tapbi.spark.gpsmappro.R
 import com.tapbi.spark.gpsmappro.databinding.FragmentHomeBinding
 import com.tapbi.spark.gpsmappro.ui.base.BaseBindingFragment
+import com.tapbi.spark.gpsmappro.utils.MediaUtil
 
 class HomeFragment : BaseBindingFragment<FragmentHomeBinding, HomeViewModel>() {
     override fun getViewModel(): Class<HomeViewModel> {

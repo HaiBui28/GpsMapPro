@@ -84,13 +84,18 @@ import com.tapbi.spark.gpsmappro.feature.BalanceBarView.Companion.Rotation_3
 import com.tapbi.spark.gpsmappro.feature.BalanceBarView.Companion.Rotation_4
 import com.tapbi.spark.gpsmappro.ui.base.BaseActivity
 import com.tapbi.spark.gpsmappro.ui.base.BaseBindingFragment
+import com.tapbi.spark.gpsmappro.ui.custom.CustomLocationImage
+import com.tapbi.spark.gpsmappro.ui.main.MainActivity
 import com.tapbi.spark.gpsmappro.ui.main.MainActivity.Companion.ACCESS_FINE_LOCATION_REQUEST_CODE
 import com.tapbi.spark.gpsmappro.ui.main.MainViewModel
+import com.tapbi.spark.gpsmappro.utils.MediaUtil
 import com.tapbi.spark.gpsmappro.utils.SimpleLocationManager
 import com.tapbi.spark.gpsmappro.utils.Utils.dpToPx
+import com.tapbi.spark.gpsmappro.utils.Utils.mergeBitmaps
 import com.tapbi.spark.gpsmappro.utils.afterMeasured
 import com.tapbi.spark.gpsmappro.utils.checkLocationPermission
 import com.tapbi.spark.gpsmappro.utils.clearAllConstraints
+import com.tapbi.spark.gpsmappro.utils.correctOrientation
 import com.tapbi.spark.gpsmappro.utils.mirrorHorizontally
 import com.tapbi.spark.gpsmappro.utils.saveToGallery
 import com.tapbi.spark.gpsmappro.utils.saveToGalleryWithLocation
@@ -150,6 +155,7 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
 
     override fun onCreatedView(view: View?, savedInstanceState: Bundle?) {
         initGoogleMap()
+        binding.customImahe.setWidthHeight(300,300)
         barcodeScanner = BarcodeScanning.getClient()
 
         cameraExecutor = Executors.newSingleThreadExecutor()
@@ -161,6 +167,11 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
             requestPermissions(REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS)
         }
         initChangeRotation()
+        binding.btnMap.setOnClickListener{
+            (activity as MainActivity).navigate(R.id.action_cameraFragment_to_googleMapFragment)
+        }
+//        Log.d("Haibq", "onCreatedView: "+ MediaUtil.getDevicePhotosByFolder(requireActivity()).size)
+//        App.instance?.foldersMap?.addAll(MediaUtil.getDevicePhotosByFolder(requireActivity()))
     }
     fun initLocation(){
         if (simpleLocationManager == null) {
@@ -593,91 +604,6 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
         return result
     }
 
-    private fun mergeBitmaps(cameraBitmap: Bitmap, overlayBitmap: Bitmap, rotation: Float): Bitmap {
-        val result = Bitmap.createBitmap(
-            cameraBitmap.width,
-            cameraBitmap.height,
-            cameraBitmap.config
-        )
-        val canvas = Canvas(result)
-        canvas.drawBitmap(cameraBitmap, 0f, 0f, null)
-        val margin = dpToPx(10).toFloat()
-
-        // Scale overlay cho vừa chiều rộng
-        val availableWidth = cameraBitmap.width - 2 * margin
-        val scale = availableWidth / overlayBitmap.width.toFloat()
-
-        val newOverlayWidth = (overlayBitmap.width * scale).toInt()
-        val newOverlayHeight = (overlayBitmap.height * scale).toInt()
-
-        val scaledOverlay = Bitmap.createScaledBitmap(
-            overlayBitmap,
-            newOverlayWidth,
-            newOverlayHeight,
-            true
-        )
-
-        // Tạo matrix xoay quanh tâm ảnh overlay
-        val matrix = Matrix()
-        matrix.postScale(1f, 1f) // scale giữ nguyên
-        matrix.postRotate(rotation, newOverlayWidth / 2f, newOverlayHeight / 2f)
-
-        val rotatedOverlay = Bitmap.createBitmap(
-            scaledOverlay,
-            0,
-            0,
-            newOverlayWidth,
-            newOverlayHeight,
-            matrix,
-            true
-        )
-
-        // Vẽ rotatedOverlay vào vị trí thích hợp
-        val left : Float
-        val top : Float
-        when(rotation){
-            Rotation_2 -> {
-                left = margin
-                top = cameraBitmap.height.toFloat()/2 - rotatedOverlay.height.toFloat()/2
-            }
-            Rotation_3 -> {
-                left = cameraBitmap.width.toFloat() - rotatedOverlay.width.toFloat() - margin
-                top = cameraBitmap.height.toFloat()/2 - rotatedOverlay.height.toFloat()/2
-            }
-            Rotation_4 -> {
-                left = margin
-                top = margin
-            }
-            else ->{
-                left = margin
-                top = cameraBitmap.height - rotatedOverlay.height - margin
-            }
-        }
-
-
-        canvas.drawBitmap(rotatedOverlay, left, top, null)
-
-        return result
-    }
-
-    fun Bitmap.correctOrientation(filePath: String): Bitmap {
-        val exif = ExifInterface(filePath)
-        val orientation = exif.getAttributeInt(
-            ExifInterface.TAG_ORIENTATION,
-            ExifInterface.ORIENTATION_NORMAL
-        )
-
-        val matrix = Matrix()
-
-        when (orientation) {
-            ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
-            ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
-            ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
-        }
-
-        return Bitmap.createBitmap(this, 0, 0, width, height, matrix, true)
-    }
-
 
     fun saveFileToGallery(context: Context, file: File) {
         val contentValues = ContentValues().apply {
@@ -743,9 +669,7 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
     }
 
     fun moveToCurrentLocation(googleMap: GoogleMap) {
-        Log.d("Haibq", "moveToCurrentLocation: 11")
         val fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity())
-        Log.d("Haibq", "moveToCurrentLocation: 1111")
         if (ActivityCompat.checkSelfPermission(
                 requireActivity(),
                 Manifest.permission.ACCESS_FINE_LOCATION
@@ -753,14 +677,9 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
         ) {
 //            googleMap?.isMyLocationEnabled = true
             fusedLocationClient.lastLocation.addOnSuccessListener { location ->
-                Log.d("Haibq", "moveToCurrentLocation: " + (location == null))
                 if (location != null) {
                     val latLng = LatLng(location.latitude, location.longitude)
-                    Log.d(
-                        "Haibq",
-                        "moveToCurrentLocation: " + location.latitude + " " + location.longitude
-                    )
-                    googleMap?.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 16f))
+                    googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 16f))
                     googleMap.addMarker(
                         MarkerOptions()
                             .position(latLng)
@@ -770,7 +689,6 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
                         val geocoder = Geocoder(requireActivity(), Locale.getDefault())
                         val addresses =
                             geocoder.getFromLocation(location.latitude, location.longitude, 1)
-                        Log.d("Haibq", "moveToCurrentLocation: " + addresses!![0].getAddressLine(0))
                         getAddressFromLocation(location.latitude,location.longitude)
                         binding.tvLocation.text = addresses!![0].getAddressLine(0)
 //                        if (!addresses.isNullOrEmpty()) {

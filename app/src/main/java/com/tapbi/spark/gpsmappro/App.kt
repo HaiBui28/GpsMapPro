@@ -2,6 +2,7 @@ package com.tapbi.spark.gpsmappro
 
 import android.app.Application
 import androidx.multidex.BuildConfig
+import com.tapbi.spark.gpsmappro.common.model.FolderPhotoModel
 import com.tapbi.spark.gpsmappro.utils.MyDebugTree
 import dagger.hilt.android.HiltAndroidApp
 import io.reactivex.rxjava3.plugins.RxJavaPlugins
@@ -9,6 +10,7 @@ import timber.log.Timber
 
 @HiltAndroidApp
 class App : Application() {
+    val foldersMap = ArrayList<FolderPhotoModel>()
     companion object {
         var instance: App? = null
             private set

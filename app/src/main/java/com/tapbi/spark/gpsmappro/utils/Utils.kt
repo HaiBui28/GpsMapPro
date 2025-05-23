@@ -6,9 +6,13 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.ImageFormat
+import android.graphics.Matrix
 import android.graphics.Rect
 import android.graphics.YuvImage
 import androidx.camera.core.ImageProxy
+import com.tapbi.spark.gpsmappro.feature.BalanceBarView.Companion.Rotation_2
+import com.tapbi.spark.gpsmappro.feature.BalanceBarView.Companion.Rotation_3
+import com.tapbi.spark.gpsmappro.feature.BalanceBarView.Companion.Rotation_4
 import java.io.ByteArrayOutputStream
 import kotlin.math.roundToInt
 
@@ -16,6 +20,7 @@ object Utils {
     fun dpToPx(dp: Int): Int {
         return (dp * Resources.getSystem().displayMetrics.density).roundToInt()
     }
+
     fun getStatusBarHeight(context: Context): Int {
         try {
             val resourceId =
@@ -32,9 +37,7 @@ object Utils {
     fun getNavigationBarHeight(context: Context): Int {
         val isNavigationBar = context.resources.getBoolean(
             context.resources.getIdentifier(
-                "config_showNavigationBar",
-                "bool",
-                "android"
+                "config_showNavigationBar", "bool", "android"
             )
         )
         val resourceId =
@@ -43,6 +46,65 @@ object Utils {
             return context.resources.getDimensionPixelSize(resourceId)
         }
         return 0
+    }
+
+    fun mergeBitmaps(cameraBitmap: Bitmap, overlayBitmap: Bitmap, rotation: Float): Bitmap {
+        val result = Bitmap.createBitmap(
+            cameraBitmap.width, cameraBitmap.height, cameraBitmap.config
+        )
+        val canvas = Canvas(result)
+        canvas.drawBitmap(cameraBitmap, 0f, 0f, null)
+        val margin = dpToPx(10).toFloat()
+
+        // Scale overlay cho vừa chiều rộng
+        val availableWidth = cameraBitmap.width - 2 * margin
+        val scale = availableWidth / overlayBitmap.width.toFloat()
+
+        val newOverlayWidth = (overlayBitmap.width * scale).toInt()
+        val newOverlayHeight = (overlayBitmap.height * scale).toInt()
+
+        val scaledOverlay = Bitmap.createScaledBitmap(
+            overlayBitmap, newOverlayWidth, newOverlayHeight, true
+        )
+
+        // Tạo matrix xoay quanh tâm ảnh overlay
+        val matrix = Matrix()
+        matrix.postScale(1f, 1f) // scale giữ nguyên
+        matrix.postRotate(rotation, newOverlayWidth / 2f, newOverlayHeight / 2f)
+
+        val rotatedOverlay = Bitmap.createBitmap(
+            scaledOverlay, 0, 0, newOverlayWidth, newOverlayHeight, matrix, true
+        )
+
+        // Vẽ rotatedOverlay vào vị trí thích hợp
+        val left: Float
+        val top: Float
+        when (rotation) {
+            Rotation_2 -> {
+                left = margin
+                top = cameraBitmap.height.toFloat() / 2 - rotatedOverlay.height.toFloat() / 2
+            }
+
+            Rotation_3 -> {
+                left = cameraBitmap.width.toFloat() - rotatedOverlay.width.toFloat() - margin
+                top = cameraBitmap.height.toFloat() / 2 - rotatedOverlay.height.toFloat() / 2
+            }
+
+            Rotation_4 -> {
+                left = margin
+                top = margin
+            }
+
+            else -> {
+                left = margin
+                top = cameraBitmap.height - rotatedOverlay.height - margin
+            }
+        }
+
+
+        canvas.drawBitmap(rotatedOverlay, left, top, null)
+
+        return result
     }
 
 
@@ -69,7 +131,12 @@ object Utils {
         return BitmapFactory.decodeByteArray(yuvByteArray, 0, yuvByteArray.size)
     }
 
-    fun overlayBitmapOnFrame(frameBitmap: Bitmap, overlayBitmap: Bitmap, x: Float, y: Float): Bitmap {
+    fun overlayBitmapOnFrame(
+        frameBitmap: Bitmap,
+        overlayBitmap: Bitmap,
+        x: Float,
+        y: Float
+    ): Bitmap {
         val resultBitmap = frameBitmap.copy(Bitmap.Config.ARGB_8888, true)
         val canvas = Canvas(resultBitmap)
         canvas.drawBitmap(overlayBitmap, x, y, null)
