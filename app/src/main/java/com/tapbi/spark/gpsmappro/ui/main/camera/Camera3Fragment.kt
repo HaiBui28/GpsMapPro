@@ -2,9 +2,11 @@ package com.tapbi.spark.gpsmappro.ui.main.camera
 
 import VideoEncoder
 import android.Manifest
+import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.ImageFormat
 import android.graphics.Matrix
 import android.graphics.Rect
@@ -13,10 +15,12 @@ import android.hardware.camera2.CameraManager
 import android.location.Geocoder
 import android.media.MediaRecorder
 import android.media.MediaScannerConnection
+import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
 import android.os.Handler
 import android.os.Looper
+import android.provider.MediaStore
 import android.util.Log
 import android.util.Size
 import android.view.Surface
@@ -41,6 +45,7 @@ import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
+import com.orhanobut.hawk.Hawk.put
 import com.tapbi.spark.gpsmappro.App
 import com.tapbi.spark.gpsmappro.R
 import com.tapbi.spark.gpsmappro.databinding.FragmentCamera3Binding
@@ -73,6 +78,7 @@ class Camera3Fragment : BaseBindingFragment<FragmentCamera3Binding, MainViewMode
 
     private var isRecording = false
     private var isEncoderInitialized = false
+    private var isImageInitialized = false
     private var isEncoderReleased = false
 
     private var imageAnalysis: ImageAnalysis? = null
@@ -170,6 +176,9 @@ class Camera3Fragment : BaseBindingFragment<FragmentCamera3Binding, MainViewMode
         binding.btnStop.setOnClickListener {
             stopRecording()
         }
+        binding.btnCapture.setOnClickListener {
+            isImageInitialized=true
+        }
     }
 
     private fun initChangeRotation() {
@@ -242,6 +251,9 @@ class Camera3Fragment : BaseBindingFragment<FragmentCamera3Binding, MainViewMode
                             processImage(imageProxy, bitmap)
                             return@post // giữ imageProxy không bị close ở đây nếu dùng processImage bất đồng bộ
                         }
+                    }else if(isImageInitialized){
+                        saveBitmapToDCIM(requireContext(),bitmap)
+                        isImageInitialized=false
                     }
 
                     imageProxy.close()
@@ -251,6 +263,35 @@ class Camera3Fragment : BaseBindingFragment<FragmentCamera3Binding, MainViewMode
             cameraProvider.unbindAll()
             cameraProvider.bindToLifecycle(viewLifecycleOwner, cameraSelector, imageAnalysis)
         }, ContextCompat.getMainExecutor(requireContext()))
+    }
+    fun saveBitmapToDCIM(context: Context, bitmap: Bitmap): Uri? {
+        gpuImage.setImage(drawBitmap(bitmap,overlayBitmap))
+        gpuImage.setFilter(GPUImageColorInvertFilter())
+        val filteredBitmap = gpuImage.bitmapWithFilterApplied
+        val filename = "IMG_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())}.jpg"
+
+        val contentValues = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, filename)
+            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+            put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_DCIM + "/YourAppFolder")
+            put(MediaStore.Images.Media.IS_PENDING, 1)
+        }
+
+        val contentResolver = context.contentResolver
+        val uri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+
+        if (uri != null) {
+            contentResolver.openOutputStream(uri)?.use { outputStream ->
+                filteredBitmap.compress(Bitmap.CompressFormat.JPEG, 100, outputStream)
+            }
+
+            // Đánh dấu đã hoàn tất ghi file
+            contentValues.clear()
+            contentValues.put(MediaStore.Images.Media.IS_PENDING, 0)
+            contentResolver.update(uri, contentValues, null, null)
+        }
+
+        return uri
     }
 
 
@@ -402,6 +443,58 @@ class Camera3Fragment : BaseBindingFragment<FragmentCamera3Binding, MainViewMode
         } catch (e: Exception) {
             e.printStackTrace()
         }
+    }
+
+
+    private fun drawBitmap(cameraFrame: Bitmap, overlay: Bitmap): Bitmap {
+        val outputBitmap = Bitmap.createBitmap(
+            cameraFrame.width,
+            cameraFrame.height,
+            Bitmap.Config.ARGB_8888
+        )
+
+        val canvas = Canvas(outputBitmap)
+
+        // Vẽ camera frame làm nền
+        canvas.drawBitmap(cameraFrame, null, Rect(0, 0, canvas.width, canvas.height), null)
+
+        val margin = dpToPx(10)
+        val scale = (canvas.width.toFloat() - 2 * margin) / overlay.width.toFloat()
+        val w = (overlay.width * scale).toInt()
+        val h = (overlay.height * scale).toInt()
+
+        var left = 0
+        var top = 0
+        var rotatedOverlay = overlay
+
+        when (rotation) {
+            Rotation_2 -> {
+                rotatedOverlay = rotateBitmap(overlay, 90f)
+                left = margin
+                top = (canvas.height - w) / 2
+            }
+            Rotation_3 -> {
+                rotatedOverlay = rotateBitmap(overlay, -90f)
+                left = canvas.width - margin - h
+                top = (canvas.height - w) / 2
+            }
+            Rotation_4 -> {
+                rotatedOverlay = rotateBitmap(overlay, 180f)
+                left = margin
+                top = margin
+            }
+            else -> {
+                left = margin
+                top = canvas.height - h - margin
+            }
+        }
+
+        val right = left + if (rotation in listOf(Rotation_2, Rotation_3)) h else w
+        val bottom = top + if (rotation in listOf(Rotation_2, Rotation_3)) w else h
+
+        canvas.drawBitmap(rotatedOverlay, null, Rect(left, top, right, bottom), null)
+
+        return outputBitmap
     }
 
     private fun rotateBitmap(source: Bitmap, angle: Float): Bitmap {
