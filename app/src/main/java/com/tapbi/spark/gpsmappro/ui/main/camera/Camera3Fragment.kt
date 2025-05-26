@@ -453,6 +453,8 @@ class Camera3Fragment : BaseBindingFragment<FragmentCamera3Binding, MainViewMode
                     // 👉 Chờ 1 frame để hệ thống render lại
                     binding.llMap.postDelayed({
                         overlayBitmap = binding.llMap.drawToBitmap()
+                        binding.imMapSnapshot.visibility = View.GONE
+                        mapFragment.requireView().visibility = View.VISIBLE
                     }, 80) // delay nhỏ để đảm bảo ảnh đã render
                 }
             }
