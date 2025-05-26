@@ -60,6 +60,7 @@ import com.tapbi.spark.gpsmappro.utils.YuvToRgbConverter
 import com.tapbi.spark.gpsmappro.utils.clearAllConstraints
 import jp.co.cyberagent.android.gpuimage.GPUImage
 import jp.co.cyberagent.android.gpuimage.filter.GPUImageColorInvertFilter
+import timber.log.Timber
 import java.io.File
 import java.io.IOException
 import java.text.SimpleDateFormat
@@ -536,14 +537,12 @@ class Camera3Fragment : BaseBindingFragment<FragmentCamera3Binding, MainViewMode
 
     fun loadBitmapLocation() {
         val mapFragment = childFragmentManager.findFragmentById(R.id.map) as SupportMapFragment
-        mapFragment.getMapAsync { googleMap ->
-            googleMap.snapshot { mapBitmap ->
+            googleMap?.snapshot { mapBitmap ->
                 if (mapBitmap != null) {
                     // 👉 Gán mapBitmap vào ImageView, ẩn fragment
                     binding.imMapSnapshot.setImageBitmap(mapBitmap)
                     binding.imMapSnapshot.visibility = View.VISIBLE
                     mapFragment.requireView().visibility = View.GONE
-
                     // 👉 Chờ 1 frame để hệ thống render lại
                     binding.llMap.postDelayed({
                         overlayBitmap = binding.llMap.drawToBitmap()
@@ -552,7 +551,6 @@ class Camera3Fragment : BaseBindingFragment<FragmentCamera3Binding, MainViewMode
                     }, 80) // delay nhỏ để đảm bảo ảnh đã render
                 }
             }
-        }
     }
 
     override fun onPermissionGranted() {
