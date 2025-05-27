@@ -215,6 +215,7 @@ class Camera3Fragment : BaseBindingFragment<FragmentCamera3Binding, MainViewMode
 
                 val rotationDegrees = imageProxy.imageInfo.rotationDegrees
                 var bitmap = allocateBitmapIfNecessary(imageProxy.width, imageProxy.height)
+                Log.d("CameraResolution", "Image size: ${imageProxy.width} x ${imageProxy.height}")
                 converter.yuvToRgb(image, bitmap)
                 bitmap = bitmap.rotate(rotationDegrees)
 

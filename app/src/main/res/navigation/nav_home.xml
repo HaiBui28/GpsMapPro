@@ -2,7 +2,7 @@
 <navigation xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/nav_host_home"
-    app:startDestination="@id/camera3Fragment">
+    app:startDestination="@id/cameraFragment">
 
     <fragment
         android:id="@+id/homeFragment"
@@ -30,4 +30,8 @@
         android:id="@+id/googleMapFragment"
         android:name="com.tapbi.spark.gpsmappro.ui.main.googlemap.GoogleMapFragment"
         android:label="GoogleMapFragment" />
+    <fragment
+        android:id="@+id/camera4Fragment"
+        android:name="com.tapbi.spark.gpsmappro.ui.main.camera4.Camera4Fragment"
+        android:label="Camera4Fragment" />
 </navigation>
