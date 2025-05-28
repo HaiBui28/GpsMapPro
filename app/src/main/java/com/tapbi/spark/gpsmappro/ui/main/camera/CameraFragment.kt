@@ -12,6 +12,7 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Matrix
+import android.graphics.Paint
 import android.graphics.PorterDuff
 import android.graphics.Rect
 import android.location.Geocoder
@@ -131,6 +132,7 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
     private var isFrontCamera = false
     private var recording: Recording? = null
     private var isBindToLifecycleQRScan = false
+    val margin = dpToPx(10)
 
     private var selectedAspectRatio = AspectRatio.RATIO_16_9
     private val REQUIRED_PERMISSIONS = arrayOf(
@@ -423,88 +425,19 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
             0,
             handler
         ) { throwable ->
-            // Xử lý lỗi nếu cần
             throwable.printStackTrace()
         }.apply {
             setOnDrawListener { frame ->
                 val canvas = frame.overlayCanvas
-                val rotation = this@CameraFragment.rotation.toInt()
-
-                overlayBitmap?.let { bitmap ->
-                    // Xóa canvas trước khi vẽ
-                    canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
-
-                    val margin = dpToPx(10)
-
-                    // Hàm xoay bitmap (bạn giữ hàm rotateBitmap sẵn có nhé)
-                    fun getRotatedBitmap(degrees: Float) = rotateBitmap(bitmap, degrees)
-
-                    // Tính scale để bitmap vừa trong canvas (trừ margin), giữ tỉ lệ
-                    val (rotatedBitmap, drawWidth, drawHeight, left, top) = when (rotation.toFloat()) {
-                        Rotation_4 -> { // 90 độ
-                            val rotated = getRotatedBitmap(90f)
-                            val scale = (canvas.height - 2 * margin).toFloat() / rotated.height
-                            val w = (rotated.width * scale).toInt()
-                            val h = (rotated.height * scale).toInt()
-                            val l = margin
-                            val t = (canvas.width - w) / 2
-                            Quad(rotated, w, h, l, t)
-                        }
-                        Rotation_1 -> { // -90 độ (270)
-                            val rotated = getRotatedBitmap(-90f)
-                            val scale = (canvas.height - 2 * margin).toFloat() / rotated.height
-                            val w = (rotated.width * scale).toInt()
-                            val h = (rotated.height * scale).toInt()
-                            val l = canvas.width - margin - w
-                            val t = (canvas.width - h) / 2
-                            Quad(rotated, w, h, l, t)
-                        }
-                        Rotation_3 -> { // 180 độ
-                            val rotated = getRotatedBitmap(180f)
-                            val scale = minOf(
-                                (canvas.width - 2 * margin).toFloat() / rotated.width,
-                                (canvas.height - 2 * margin).toFloat() / rotated.height
-                            )
-                            val w = (rotated.width * scale).toInt()
-                            val h = (rotated.height * scale).toInt()
-                            val l = margin
-                            val t = margin
-                            Quad(rotated, w, h, l, t)
-                        }
-                        else -> { // 0 độ
-                            val scale = minOf(
-                                (canvas.width - 2 * margin).toFloat() / bitmap.width,
-                                (canvas.height - 2 * margin).toFloat() / bitmap.height
-                            )
-                            val w = (bitmap.width * scale).toInt()
-                            val h = (bitmap.height * scale).toInt()
-                            val l = margin
-                            val t = canvas.height - margin - h
-                            Quad(bitmap, w, h, l, t)
-                        }
-                    }
-
-                    // Vẽ bitmap đã xoay và scale đúng vị trí
-                    canvas.drawBitmap(
-                        rotatedBitmap,
-                        null,
-                        Rect(left, top, left + drawWidth, top + drawHeight),
-                        null
-                    )
-                }
-
-                // Ẩn llMap trên UI thread nếu đang hiện
-                activity?.runOnUiThread {
-                    if (binding.llMap.visibility == View.VISIBLE) {
-                        binding.llMap.visibility = View.GONE
-                    }
+                canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
+                overlayBitmap?.let { it1->
+                    val destRect = Rect(0, 0, it1.width, it1.height)
+                    canvas.drawBitmap(it1, null, destRect, null)
                 }
 
                 true
             }
         }
-
-
         val useCaseGroup = UseCaseGroup.Builder()
             .addUseCase(preview)
             .addUseCase(videoCapture)
@@ -538,6 +471,20 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
             Log.e("Camera", "Use case binding failed", e)
         }
     }
+
+    fun createGreenBitmap( width : Int = 300,
+                           height : Int = 300): Bitmap {
+
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val paint = Paint().apply {
+            color = Color.GREEN
+        }
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
+
+        return bitmap
+    }
+
 
     fun rotateBitmap(bitmap: Bitmap, angle: Float): Bitmap {
         val matrix = Matrix()
@@ -857,14 +804,6 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
                             geocoder.getFromLocation(location.latitude, location.longitude, 1)
                         getAddressFromLocation(location.latitude, location.longitude)
                         binding.tvLocation.text = addresses!![0].getAddressLine(0)
-//                        if (!addresses.isNullOrEmpty()) {
-//                            val city = addresses[0].getAddressLine(0).split(",").run {
-//                                if (size >= 2) this[size - 2] else this[0]
-//                            }.trim { it <= ' ' }
-//                            val cityCut = getFormattedCityName(city)
-//                            Hawk.put(Constant.CURRENT_CITY, cityCut)
-//                            getWeather(context, isLoadCity, cityCut, dataWeather)
-//                        }
                     } catch (e: IOException) {
                         e.printStackTrace()
                     }
@@ -939,7 +878,7 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
 
                     // 👉 Chờ 1 frame để hệ thống render lại
                     binding.llMap.postDelayed({
-                        binding.llMap.visibility=View.VISIBLE
+                        binding.llMap.visibility=View.INVISIBLE
                         overlayBitmap = binding.llMap.drawToBitmap()
 
                     }, 80) // delay nhỏ để đảm bảo ảnh đã render
