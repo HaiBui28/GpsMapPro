@@ -44,41 +44,55 @@ class CustomLocationImage : View {
     }
 
     private fun drawBackgroundCircle(canvas: Canvas){
-        canvas.drawCircle(width/2f, height/2f, width/2f, paint)
+        canvas.drawCircle(width/2f, height/2f - 100, width/2f, paint)
     }
 
     private fun drawTriangle(canvas: Canvas) {
         val path = Path()
+        val radius = 20f
 
-        val topLeft = PointF(100f, 100f)
-        val topRight = PointF(200f, 100f)
-        val bottom = PointF(150f, 200f)
+        val centerX = width / 2f
+        val topY = 0f
+        val bottomY = height.toFloat()
 
-        val radius = 10f // độ bo tròn
+        val leftX = centerX - width / 6f
+        val rightX = centerX + width / 6f
 
-        path.moveTo(topLeft.x, topLeft.y)
-        path.lineTo(topRight.x, topRight.y)
+        // Bắt đầu từ đáy bên trái
+        path.moveTo(leftX + radius, topY)
 
-        // Đi tới điểm trước góc dưới
-        path.lineTo(bottom.x + radius, bottom.y - radius)
+        // Vẽ cạnh trái lên đỉnh
+        path.lineTo(centerX, bottomY)
 
-        // Bo góc bằng cubicTo (vào góc dưới rồi ra khỏi góc)
+        // Vẽ cạnh phải về lại đáy phải
+        path.lineTo(rightX - radius, topY)
+
+        // Bo góc phải
         path.cubicTo(
-            150f + radius, 200f,     // Control point 1
-            150f - radius, 200f,     // Control point 2
-            150f - radius, 200f - radius  // Điểm kết thúc cong
+            rightX, topY,             // Control point 1
+            rightX, topY + radius,    // Control point 2
+            rightX - radius, topY + radius // Kết thúc bo
         )
 
-        path.lineTo(topLeft.x, topLeft.y)
+        // Vẽ đáy → trái
+        path.lineTo(leftX + radius, topY + radius)
+
+        // Bo góc trái
+        path.cubicTo(
+            leftX, topY + radius,     // Control point 1
+            leftX, topY,              // Control point 2
+            leftX + radius, topY      // Kết thúc bo
+        )
 
         path.close()
-
         canvas.drawPath(path, paint)
     }
 
+
+
     override fun draw(canvas: Canvas) {
         super.draw(canvas)
-//        drawBackgroundCircle(canvas)
+        drawBackgroundCircle(canvas)
         drawTriangle(canvas)
         Timber.e("asasasasasasasaasa")
     }

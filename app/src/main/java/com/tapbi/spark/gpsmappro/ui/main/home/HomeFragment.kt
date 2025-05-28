@@ -18,6 +18,7 @@ class HomeFragment : BaseBindingFragment<FragmentHomeBinding, HomeViewModel>() {
 
     override fun onCreatedView(view: View?, savedInstanceState: Bundle?) {
 
+
     }
 
     override fun onPermissionGranted() {

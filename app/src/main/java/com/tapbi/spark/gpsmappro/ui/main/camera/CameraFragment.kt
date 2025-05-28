@@ -136,8 +136,8 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
 
     private var selectedAspectRatio = AspectRatio.RATIO_16_9
     private val REQUIRED_PERMISSIONS = arrayOf(
-        android.Manifest.permission.CAMERA,
-        android.Manifest.permission.RECORD_AUDIO
+        Manifest.permission.CAMERA,
+        Manifest.permission.RECORD_AUDIO
     )
     private val REQUEST_CODE_PERMISSIONS = 10
     private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
@@ -179,8 +179,8 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
         binding.btnMap.setOnClickListener {
             (activity as MainActivity).navigate(R.id.action_cameraFragment_to_googleMapFragment)
         }
-//        Log.d("Haibq", "onCreatedView: "+ MediaUtil.getDevicePhotosByFolder(requireActivity()).size)
-//        App.instance?.foldersMap?.addAll(MediaUtil.getDevicePhotosByFolder(requireActivity()))
+        Log.d("Haibq", "onCreatedView: "+ MediaUtil.getDevicePhotosByFolder(requireActivity()).size)
+        App.instance?.let { viewModel.getListLocationPhoto(it) }
     }
 
     fun initLocation() {
@@ -300,7 +300,12 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
     }
 
     override fun observerLiveData() {
-
+        viewModel.listLocationPhoto.observe(viewLifecycleOwner) {
+            if (App.instance?.foldersMap?.isEmpty() == true){
+                App.instance?.foldersMap?.addAll(it)
+            }
+            Log.d("Haibq", "observerLiveData: "+ it.size)
+        }
     }
 
     override fun onBackPressed() {
@@ -699,6 +704,94 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
         canvas.drawBitmap(scaledOverlay, dpToPx(10).toFloat(), topOffset.toFloat(), null)
 
         return result
+    }
+
+    private fun mergeBitmaps(cameraBitmap: Bitmap, overlayBitmap: Bitmap, rotation: Float): Bitmap {
+        val result = Bitmap.createBitmap(
+            cameraBitmap.width,
+            cameraBitmap.height,
+            cameraBitmap.config
+        )
+        val canvas = Canvas(result)
+        canvas.drawBitmap(cameraBitmap, 0f, 0f, null)
+        val margin = dpToPx(10).toFloat()
+
+        // Scale overlay cho vừa chiều rộng
+        val availableWidth = cameraBitmap.width - 2 * margin
+        val scale = availableWidth / overlayBitmap.width.toFloat()
+
+        val newOverlayWidth = (overlayBitmap.width * scale).toInt()
+        val newOverlayHeight = (overlayBitmap.height * scale).toInt()
+
+        val scaledOverlay = Bitmap.createScaledBitmap(
+            overlayBitmap,
+            newOverlayWidth,
+            newOverlayHeight,
+            true
+        )
+
+        // Tạo matrix xoay quanh tâm ảnh overlay
+        val matrix = Matrix()
+        matrix.postScale(1f, 1f) // scale giữ nguyên
+        matrix.postRotate(rotation, newOverlayWidth / 2f, newOverlayHeight / 2f)
+
+        val rotatedOverlay = Bitmap.createBitmap(
+            scaledOverlay,
+            0,
+            0,
+            newOverlayWidth,
+            newOverlayHeight,
+            matrix,
+            true
+        )
+
+        // Vẽ rotatedOverlay vào vị trí thích hợp
+        val left: Float
+        val top: Float
+        when (rotation) {
+            Rotation_2 -> {
+                left = margin
+                top = cameraBitmap.height.toFloat() / 2 - rotatedOverlay.height.toFloat() / 2
+            }
+
+            Rotation_3 -> {
+                left = cameraBitmap.width.toFloat() - rotatedOverlay.width.toFloat() - margin
+                top = cameraBitmap.height.toFloat() / 2 - rotatedOverlay.height.toFloat() / 2
+            }
+
+            Rotation_4 -> {
+                left = margin
+                top = margin
+            }
+
+            else -> {
+                left = margin
+                top = cameraBitmap.height - rotatedOverlay.height - margin
+            }
+        }
+
+
+        canvas.drawBitmap(rotatedOverlay, left, top, null)
+
+        return result
+    }
+
+    fun Bitmap.correctOrientation(filePath: String): Bitmap {
+        val exif = ExifInterface(filePath)
+        val orientation = exif.getAttributeInt(
+            ExifInterface.TAG_ORIENTATION,
+            ExifInterface.ORIENTATION_NORMAL
+        )
+
+        val matrix = Matrix()
+
+        when (orientation) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
+            ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
+            ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
+        }
+
+        return Bitmap.createBitmap(this, 0, 0, width, height, matrix, true)
     }
 
 
