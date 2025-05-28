@@ -6,6 +6,7 @@ import android.database.Cursor
 import android.location.Geocoder
 import android.media.ExifInterface
 import android.net.Uri
+import android.os.Build
 import android.provider.MediaStore
 import android.util.Log
 import androidx.core.database.getDoubleOrNull
@@ -33,38 +34,24 @@ object MediaUtil {
         cursor?.use {
             Log.d("Haibq", "getDevicePhotosByFolder: 2")
             val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
-//            val folderColumn =
-//                cursor.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_DISPLAY_NAME)
-//            val titleColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.TITLE)
-//            val displayNameColumn =
-//                cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
-//            val dateTakenColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_TAKEN)
-//            val dateModifiedColumn =
-//                cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_MODIFIED)
-//            val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.SIZE)
-//            val widthColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.WIDTH)
-//            val heightColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.HEIGHT)
-//            val mimeTypeColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.MIME_TYPE)
 
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idColumn)
-//                val folderName = cursor.getString(folderColumn)
-//                val title = cursor.getString(titleColumn)
-//                val displayName = cursor.getString(displayNameColumn)
-//                val dateTaken = cursor.getLongOrNull(dateTakenColumn)
-//                val dateModified = cursor.getLongOrNull(dateModifiedColumn)
-//                val size = cursor.getLongOrNull(sizeColumn)
-//                val width = cursor.getIntOrNull(widthColumn)
-//                val height = cursor.getIntOrNull(heightColumn)
-//                val mimeType = cursor.getString(mimeTypeColumn)
-
                 val contentUri: Uri = ContentUris.withAppendedId(
                     MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id
                 )
                 try {
                     val inputStream = context.contentResolver.openInputStream(contentUri)
 //                    getPathFromUri(context, contentUri)
-                    val exifInterface = ExifInterface(getPathFromUri(context, contentUri)!!)
+                    val exifInterface = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                            ExifInterface(inputStream!!, ExifInterface.STREAM_TYPE_FULL_IMAGE_DATA)
+                        } else {
+                            TODO("VERSION.SDK_INT < R")
+                        }
+                    } else {
+                        TODO("VERSION.SDK_INT < N")
+                    }
                     val latLong = FloatArray(2)
                     if (exifInterface.getLatLong(latLong)) {
                         val geocoder = Geocoder(context, Locale.getDefault())
@@ -79,7 +66,7 @@ object MediaUtil {
                       listPhoto.add(photo)
                     }
                 } catch (e: Exception) {
-                    Log.d("Haibq", "getDevicePhotosByFolder: " + e)
+                    Log.d("c", "getDevicePhotosByFolder: " + e)
                 }
             }
             for (i in listPhoto) {

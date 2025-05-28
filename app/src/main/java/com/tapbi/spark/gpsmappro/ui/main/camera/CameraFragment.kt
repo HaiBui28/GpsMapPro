@@ -130,14 +130,15 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
 
     private var selectedAspectRatio = AspectRatio.RATIO_16_9
     private val REQUIRED_PERMISSIONS = arrayOf(
-        android.Manifest.permission.CAMERA,
-        android.Manifest.permission.RECORD_AUDIO
+        Manifest.permission.CAMERA,
+        Manifest.permission.RECORD_AUDIO
     )
     private val REQUEST_CODE_PERMISSIONS = 10
     private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
         ContextCompat.checkSelfPermission(requireContext(), it) == PackageManager.PERMISSION_GRANTED
     }
-    private var simpleLocationManager : SimpleLocationManager? = null
+
+    private var simpleLocationManager: SimpleLocationManager? = null
     private lateinit var barcodeScanner: BarcodeScanner
     private lateinit var cameraExecutor: ExecutorService
 
@@ -153,7 +154,7 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
 
     override fun onCreatedView(view: View?, savedInstanceState: Bundle?) {
         initGoogleMap()
-        binding.customImahe.setWidthHeight(300,300)
+        binding.customImahe.setWidthHeight(300, 300)
         barcodeScanner = BarcodeScanning.getClient()
 
         cameraExecutor = Executors.newSingleThreadExecutor()
@@ -165,13 +166,14 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
             requestPermissions(REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS)
         }
         initChangeRotation()
-        binding.btnMap.setOnClickListener{
+        binding.btnMap.setOnClickListener {
             (activity as MainActivity).navigate(R.id.action_cameraFragment_to_googleMapFragment)
         }
-//        Log.d("Haibq", "onCreatedView: "+ MediaUtil.getDevicePhotosByFolder(requireActivity()).size)
-//        App.instance?.foldersMap?.addAll(MediaUtil.getDevicePhotosByFolder(requireActivity()))
+        Log.d("Haibq", "onCreatedView: "+ MediaUtil.getDevicePhotosByFolder(requireActivity()).size)
+        App.instance?.let { viewModel.getListLocationPhoto(it) }
     }
-    fun initLocation(){
+
+    fun initLocation() {
         if (simpleLocationManager == null) {
             (activity as? BaseActivity)?.let {
                 simpleLocationManager = SimpleLocationManager(it)
@@ -179,20 +181,26 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
         }
         requestLocationUpdates()
     }
+
     private fun requestLocationUpdates() {
         (activity as? BaseActivity)?.apply {
             if (checkLocationPermission()) {
                 simpleLocationManager?.requestLocationUpdates()
             } else {
-                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), ACCESS_FINE_LOCATION_REQUEST_CODE)
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
+                    ACCESS_FINE_LOCATION_REQUEST_CODE
+                )
             }
         }
     }
-    private fun initChangeRotation(){
-        binding.balanceBarView.setRotationListener(object :BalanceBarView.RotationListener{
+
+    private fun initChangeRotation() {
+        binding.balanceBarView.setRotationListener(object : BalanceBarView.RotationListener {
             override fun onRotationChanged(rotation: Float) {
-                if (lifecycle.currentState == Lifecycle.State.RESUMED){
-                    Log.e("NVQ","NVQ 23456789 rotation: $rotation")
+                if (lifecycle.currentState == Lifecycle.State.RESUMED) {
+                    Log.e("NVQ", "NVQ 23456789 rotation: $rotation")
                     this@CameraFragment.rotation = rotation
                     handler.removeCallbacks(runnable)
                     handler.postDelayed(runnable, 300)
@@ -200,34 +208,40 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
             }
         })
     }
-    fun loadMapRotation(rotation: Float){
+
+    fun loadMapRotation(rotation: Float) {
         binding.llMap.apply {
             val m10dp = dpToPx(10)
             val params = layoutParams as? ConstraintLayout.LayoutParams
             params?.let {
                 it.clearAllConstraints()
-                when(rotation){
+                when (rotation) {
                     Rotation_2 -> {
-                        translationX = -((binding.llMap.width/2) - (binding.llMap.height/2)).toFloat()
+                        translationX =
+                            -((binding.llMap.width / 2) - (binding.llMap.height / 2)).toFloat()
                         translationY = 0f
                         it.setMargins(m10dp)
                         it.topToTop = binding.previewView.id
                         it.bottomToBottom = binding.previewView.id
                     }
+
                     Rotation_3 -> {
-                        translationX = ((binding.llMap.width/2) - (binding.llMap.height/2)).toFloat()
+                        translationX =
+                            ((binding.llMap.width / 2) - (binding.llMap.height / 2)).toFloat()
                         translationY = 0f
                         it.setMargins(m10dp)
                         it.topToTop = binding.previewView.id
                         it.bottomToBottom = binding.previewView.id
                     }
+
                     Rotation_4 -> {
                         translationX = 0f
                         translationY = 0f
-                        it.setMargins(m10dp,dpToPx(10)+ App.statusBarHeight,m10dp,m10dp)
+                        it.setMargins(m10dp, dpToPx(10) + App.statusBarHeight, m10dp, m10dp)
                         params.topToTop = binding.previewView.id
                     }
-                    else ->{
+
+                    else -> {
                         translationX = 0f
                         translationY = 0f
                         it.setMargins(m10dp)
@@ -238,6 +252,7 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
             }
         }
     }
+
     private fun initGoogleMap() {
         activity?.let {
             val mapFragment = childFragmentManager
@@ -273,7 +288,12 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
     }
 
     override fun observerLiveData() {
-
+        viewModel.listLocationPhoto.observe(viewLifecycleOwner) {
+            if (App.instance?.foldersMap?.isEmpty() == true){
+                App.instance?.foldersMap?.addAll(it)
+            }
+            Log.d("Haibq", "observerLiveData: "+ it.size)
+        }
     }
 
     override fun onBackPressed() {
@@ -319,7 +339,7 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
         binding.btnVideo.setOnClickListener {
 //            if (recording != null) stopRecording() else startRecording()
             binding.llMap.translationX -= 10
-            Log.e("NVQ","NVQ 123456789 ${binding.llMap.translationX}")
+            Log.e("NVQ", "NVQ 123456789 ${binding.llMap.translationX}")
         }
 
         binding.btnFlash.setOnClickListener {
@@ -517,7 +537,8 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
                         .correctOrientation(filePath)
                         .let { if (isFrontCamera) it.mirrorHorizontally() else it }
 
-                    val mapFragment = childFragmentManager.findFragmentById(R.id.map) as SupportMapFragment
+                    val mapFragment =
+                        childFragmentManager.findFragmentById(R.id.map) as SupportMapFragment
                     mapFragment.getMapAsync { googleMap ->
                         googleMap.snapshot { mapBitmap ->
                             if (mapBitmap != null) {
@@ -532,11 +553,20 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
 
                                     // 👉 Gộp và lưu ảnh ở background
                                     lifecycleScope.launch(Dispatchers.IO) {
-                                        val finalBitmap = mergeBitmaps(bitmapCamera, bitmapOverlay, rotation)
-                                        finalBitmap.saveToGalleryWithLocation(requireContext(),simpleLocationManager?.getLocation(),rotation )
+                                        val finalBitmap =
+                                            mergeBitmaps(bitmapCamera, bitmapOverlay, rotation)
+                                        finalBitmap.saveToGalleryWithLocation(
+                                            requireContext(),
+                                            simpleLocationManager?.getLocation(),
+                                            rotation
+                                        )
 
                                         withContext(Dispatchers.Main) {
-                                            Toast.makeText(context, "Đã lưu ảnh với overlay", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(
+                                                context,
+                                                "Đã lưu ảnh với overlay",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
 
                                             // 👉 Khôi phục MapFragment sau khi chụp xong (optional)
                                             binding.imMapSnapshot.visibility = View.GONE
@@ -550,7 +580,11 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
                 }
 
                 override fun onError(exception: ImageCaptureException) {
-                    Toast.makeText(context, "Lỗi chụp ảnh: ${exception.message}", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        context,
+                        "Lỗi chụp ảnh: ${exception.message}",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             }
         )
@@ -573,7 +607,11 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
     }
 
 
-    private fun mergeBitmaps2(cameraBitmap: Bitmap, overlayBitmap: Bitmap ,rotation : Float): Bitmap {
+    private fun mergeBitmaps2(
+        cameraBitmap: Bitmap,
+        overlayBitmap: Bitmap,
+        rotation: Float
+    ): Bitmap {
         val result = Bitmap.createBitmap(
             cameraBitmap.width,
             cameraBitmap.height,
@@ -584,7 +622,7 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
         val m10dp = dpToPx(10)
 
         // ✅ Sử dụng Float để tránh chia lấy phần nguyên
-        val availableWidth = cameraBitmap.width - 2*m10dp
+        val availableWidth = cameraBitmap.width - 2 * m10dp
         val scale = availableWidth.toFloat() / overlayBitmap.width.toFloat()
 
         val newOverlayWidth = (overlayBitmap.width * scale).toInt()
@@ -642,22 +680,25 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
         )
 
         // Vẽ rotatedOverlay vào vị trí thích hợp
-        val left : Float
-        val top : Float
-        when(rotation){
+        val left: Float
+        val top: Float
+        when (rotation) {
             Rotation_2 -> {
                 left = margin
-                top = cameraBitmap.height.toFloat()/2 - rotatedOverlay.height.toFloat()/2
+                top = cameraBitmap.height.toFloat() / 2 - rotatedOverlay.height.toFloat() / 2
             }
+
             Rotation_3 -> {
                 left = cameraBitmap.width.toFloat() - rotatedOverlay.width.toFloat() - margin
-                top = cameraBitmap.height.toFloat()/2 - rotatedOverlay.height.toFloat()/2
+                top = cameraBitmap.height.toFloat() / 2 - rotatedOverlay.height.toFloat() / 2
             }
+
             Rotation_4 -> {
                 left = margin
                 top = margin
             }
-            else ->{
+
+            else -> {
                 left = margin
                 top = cameraBitmap.height - rotatedOverlay.height - margin
             }
@@ -772,7 +813,7 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
                         val geocoder = Geocoder(requireActivity(), Locale.getDefault())
                         val addresses =
                             geocoder.getFromLocation(location.latitude, location.longitude, 1)
-                        getAddressFromLocation(location.latitude,location.longitude)
+                        getAddressFromLocation(location.latitude, location.longitude)
                         binding.tvLocation.text = addresses!![0].getAddressLine(0)
 //                        if (!addresses.isNullOrEmpty()) {
 //                            val city = addresses[0].getAddressLine(0).split(",").run {
@@ -791,6 +832,7 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
             Log.d("Haibq", "moveToCurrentLocation: 1")
         }
     }
+
     fun getAddressFromLocation(lat: Double, lon: Double) {
         val geocoder = Geocoder(requireContext(), Locale.getDefault())
         try {
@@ -810,6 +852,7 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
             e.printStackTrace()
         }
     }
+
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
