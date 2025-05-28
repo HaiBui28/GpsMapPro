@@ -12,6 +12,7 @@ import android.view.View
 import android.widget.Toast
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.app.ActivityCompat
+import androidx.core.view.drawToBitmap
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
@@ -28,6 +29,7 @@ import com.tapbi.spark.gpsmappro.R
 import com.tapbi.spark.gpsmappro.databinding.FragmentCamera5Binding
 import com.tapbi.spark.gpsmappro.ui.base.BaseBindingFragment
 import com.tapbi.spark.gpsmappro.ui.main.MainViewModel
+import com.tapbi.spark.gpsmappro.utils.Utils
 import java.io.File
 import java.io.IOException
 import java.text.SimpleDateFormat
@@ -58,7 +60,7 @@ class Camera5Fragment :BaseBindingFragment<FragmentCamera5Binding, MainViewModel
     private fun initListener() {
         binding.fabVideo.setOnClickListener { captureVideoSnapshot() }
         binding.fabPicture.setOnClickListener { capturePictureSnapshot() }
-        binding.fabFront.setOnClickListener { toggleCamera() }
+        binding.fabFront.setOnClickListener { loadBitmapLocation() }
     }
 
     private fun initCamera() {
@@ -183,6 +185,7 @@ class Camera5Fragment :BaseBindingFragment<FragmentCamera5Binding, MainViewModel
         moveToCurrentLocation(map)
         map.setOnCameraIdleListener {
         }
+        loadBitmapLocation()
     }
     fun moveToCurrentLocation(googleMap: GoogleMap) {
         val fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity())
@@ -235,5 +238,17 @@ class Camera5Fragment :BaseBindingFragment<FragmentCamera5Binding, MainViewModel
         } catch (e: IOException) {
             e.printStackTrace()
         }
+    }
+    fun loadBitmapLocation() {
+        Utils.safeDelay(1500) {
+            googleMap?.snapshot { mapBitmap ->
+                if (mapBitmap != null) {
+                    binding.imMapSnapshot.setImageBitmap(mapBitmap)
+                    binding.imMapSnapshot.visibility = View.VISIBLE
+                    Log.e("NVQ","loadBitmapLocation11111")
+                }
+            }
+        }
+
     }
 }
