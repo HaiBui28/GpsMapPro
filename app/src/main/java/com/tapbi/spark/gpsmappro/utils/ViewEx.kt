@@ -5,10 +5,14 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Matrix
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
 import android.location.Location
 import android.os.Build
 import android.provider.MediaStore
+//import android.service.credentials.PermissionUtils.hasPermission
 import android.util.Log
 import android.view.View
 import android.view.ViewTreeObserver
@@ -117,4 +121,45 @@ fun Bitmap.saveToGalleryWithLocation(context: Context, location: Location?, rota
     // 5. Xoá file tạm
     tempFile.delete()
 }
+fun Bitmap.correctOrientation(filePath: String): Bitmap {
+    val exif = android.media.ExifInterface(filePath)
+    val orientation = exif.getAttributeInt(
+        android.media.ExifInterface.TAG_ORIENTATION,
+        android.media.ExifInterface.ORIENTATION_NORMAL
+    )
+
+    val matrix = Matrix()
+
+    when (orientation) {
+        android.media.ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
+        android.media.ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
+        android.media.ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
+    }
+
+    return Bitmap.createBitmap(this, 0, 0, width, height, matrix, true)
+}
+fun Drawable.toBitmap(): Bitmap {
+    if (this is BitmapDrawable) {
+        return bitmap
+    }
+
+    val width = intrinsicWidth.takeIf { it > 0 } ?: 1
+    val height = intrinsicHeight.takeIf { it > 0 } ?: 1
+    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    setBounds(0, 0, canvas.width, canvas.height)
+    draw(canvas)
+    return bitmap
+}
+fun viewToBitmap(view: View): Bitmap {
+    val bitmap = Bitmap.createBitmap(
+        view.width,
+        view.height,
+        Bitmap.Config.ARGB_8888
+    )
+    val canvas = Canvas(bitmap)
+    view.draw(canvas)
+    return bitmap
+}
+
 
