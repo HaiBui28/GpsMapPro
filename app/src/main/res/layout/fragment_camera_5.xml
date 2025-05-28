@@ -5,25 +5,89 @@
         android:layout_height="match_parent">
         <com.otaliastudios.cameraview.CameraView
             android:id="@+id/camera"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
             android:keepScreenOn="true"
             app:cameraAudio="on"
+            app:cameraHdr="on"
+            app:cameraPreviewFrameRate="23"
+            app:cameraVideoBitRate="25000000"
+            app:cameraAudioBitRate="128000"
             app:cameraExperimental="true"
             app:cameraEngine="camera2"
             app:cameraPreview="glSurface"
             app:cameraGesturePinch="zoom"
             app:cameraGestureScrollHorizontal="zoom"
             app:cameraGestureScrollVertical="zoom">
-            <View
-                android:id="@+id/viewOverLay"
-                android:layout_width="300dp"
-                android:layout_height="100dp"
-                android:layout_gravity="center_horizontal|top"
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:id="@+id/llMap"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="top|center_horizontal"
+                android:layout_margin="10dp"
                 app:layout_drawOnPreview="true"
                 app:layout_drawOnPictureSnapshot="true"
-                app:layout_drawOnVideoSnapshot="true"
-                android:background="#FF00FF"/>
+                app:layout_drawOnVideoSnapshot="true">
+
+                <androidx.constraintlayout.widget.Guideline
+                    android:id="@+id/guideline"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    app:layout_constraintGuide_percent="0.35" />
+
+                <androidx.cardview.widget.CardView
+                    android:id="@+id/cardView"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintDimensionRatio="1:1"
+                    app:layout_constraintEnd_toStartOf="@+id/guideline"
+                    app:layout_constraintStart_toStartOf="parent">
+
+                    <ImageView
+                        android:id="@+id/imMapSnapshot"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:scaleType="centerCrop"
+                        android:visibility="gone" />
+
+
+                    <fragment xmlns:android="http://schemas.android.com/apk/res/android"
+                        xmlns:map="http://schemas.android.com/apk/res-auto"
+                        android:id="@+id/map"
+                        android:name="com.google.android.gms.maps.SupportMapFragment"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        map:cameraTilt="30"
+                        map:uiRotateGestures="false"
+                        map:uiZoomControls="false" />
+                </androidx.cardview.widget.CardView>
+
+                <androidx.constraintlayout.widget.ConstraintLayout
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:background="@color/black"
+                    app:layout_constraintBottom_toBottomOf="@+id/cardView"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toEndOf="@+id/guideline"
+                    app:layout_constraintTop_toTopOf="@+id/cardView">
+
+                    <TextView
+                        android:id="@+id/tvLocation"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="start"
+                        android:textColor="@color/white"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent" />
+                </androidx.constraintlayout.widget.ConstraintLayout>
+            </androidx.constraintlayout.widget.ConstraintLayout>
         </com.otaliastudios.cameraview.CameraView>
         <androidx.constraintlayout.widget.ConstraintLayout
             android:layout_height="match_parent"
@@ -66,18 +130,6 @@
                 app:layout_constraintEnd_toStartOf="@id/fab_picture"
                 android:layout_marginEnd="16dp"
                 />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="0dp"
-                app:layout_constraintTop_toTopOf="parent"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                android:layout_marginTop="16dp"
-                android:text="Draw on the screen!"
-                android:textColor="@android:color/white"
-                />
-
         </androidx.constraintlayout.widget.ConstraintLayout>
     </androidx.constraintlayout.widget.ConstraintLayout>
 </layout>
