@@ -1,6 +1,7 @@
 package com.otaliastudios.cameraview.filters;
 
 import android.opengl.GLES20;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 
@@ -23,7 +24,7 @@ public class BrightnessFilter extends BaseFilter implements OneParameterFilter {
             + "  gl_FragColor = brightness * color;\n"
             + "}\n";
 
-    private float brightness = 2.0f; // 1.0F...2.0F
+    private float brightness = 1.0f; // 1.0F...2.0F
     private int brightnessLocation = -1;
 
 
@@ -38,7 +39,7 @@ public class BrightnessFilter extends BaseFilter implements OneParameterFilter {
      */
     @SuppressWarnings({"WeakerAccess", "unused"})
     public void setBrightness(float brightness) {
-        if (brightness < 1.0f) brightness = 1.0f;
+        if (brightness < 0.2f) brightness = 0.2f;
         if (brightness > 2.0f) brightness = 2.0f;
         this.brightness = brightness;
     }
@@ -57,13 +58,14 @@ public class BrightnessFilter extends BaseFilter implements OneParameterFilter {
     @Override
     public void setParameter1(float value) {
         // parameter is 0...1, brightness is 1...2.
-        setBrightness(value + 1);
+        Log.e("NVQ","set brightness+++ " +value);
+        setBrightness(value);
     }
 
     @Override
     public float getParameter1() {
         // parameter is 0...1, brightness is 1...2.
-        return getBrightness() - 1F;
+        return getBrightness();
     }
 
     @NonNull

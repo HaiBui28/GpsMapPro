@@ -14,7 +14,6 @@ import android.view.View
 import android.widget.Toast
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.app.ActivityCompat
-import androidx.core.view.drawToBitmap
 import androidx.core.view.setMargins
 import androidx.lifecycle.Lifecycle
 import com.google.android.gms.location.LocationServices
@@ -29,6 +28,13 @@ import com.otaliastudios.cameraview.FileCallback
 import com.otaliastudios.cameraview.PictureResult
 import com.otaliastudios.cameraview.VideoResult
 import com.otaliastudios.cameraview.controls.Facing
+import com.otaliastudios.cameraview.filter.Filters
+import com.otaliastudios.cameraview.filter.MultiFilter
+import com.otaliastudios.cameraview.filters.BrightnessFilter
+import com.otaliastudios.cameraview.overlay.OverlayDrawer.markOverlayDirty
+import com.otaliastudios.cameraview.size.AspectRatio
+import com.otaliastudios.cameraview.size.SizeSelector
+import com.otaliastudios.cameraview.size.SizeSelectors
 import com.tapbi.spark.gpsmappro.App
 import com.tapbi.spark.gpsmappro.R
 import com.tapbi.spark.gpsmappro.databinding.FragmentCamera5Binding
@@ -38,8 +44,6 @@ import com.tapbi.spark.gpsmappro.feature.BalanceBarView.Companion.Rotation_3
 import com.tapbi.spark.gpsmappro.feature.BalanceBarView.Companion.Rotation_4
 import com.tapbi.spark.gpsmappro.ui.base.BaseBindingFragment
 import com.tapbi.spark.gpsmappro.ui.main.MainViewModel
-import com.tapbi.spark.gpsmappro.ui.main.camera.CameraFragment
-import com.tapbi.spark.gpsmappro.utils.Utils
 import com.tapbi.spark.gpsmappro.utils.Utils.dpToPx
 import com.tapbi.spark.gpsmappro.utils.clearAllConstraints
 import java.io.File
@@ -58,6 +62,9 @@ class Camera5Fragment :BaseBindingFragment<FragmentCamera5Binding, MainViewModel
             .rotation(rotation)
             .setDuration(300)
             .start()
+    }
+    val loadMapImageRunnable = Runnable {
+        loadBitmapLocation(){}
     }
     override fun getViewModel(): Class<MainViewModel> {
         return MainViewModel::class.java
@@ -82,7 +89,7 @@ class Camera5Fragment :BaseBindingFragment<FragmentCamera5Binding, MainViewModel
     private fun initListener() {
         binding.fabVideo.setOnClickListener { captureVideoSnapshot() }
         binding.fabPicture.setOnClickListener { capturePictureSnapshot() }
-        binding.fabFront.setOnClickListener { loadBitmapLocation() }
+        binding.fabFront.setOnClickListener {toggleCamera()}
     }
     private fun initChangeRotation() {
         binding.balanceBarView.setRotationListener(object : BalanceBarView.RotationListener {
@@ -143,7 +150,6 @@ class Camera5Fragment :BaseBindingFragment<FragmentCamera5Binding, MainViewModel
 
     private fun initCamera() {
         binding.camera.setLifecycleOwner(viewLifecycleOwner)
-        binding.camera.setVideoMaxDuration(3600 * 1000)
         binding.camera.addCameraListener(object : CameraListener() {
             override fun onPictureTaken(result: PictureResult) {
                 val dateFormat = SimpleDateFormat("yyyyMMdd_HH_mm_ss", Locale.US)
@@ -179,7 +185,11 @@ class Camera5Fragment :BaseBindingFragment<FragmentCamera5Binding, MainViewModel
 
             override fun onVideoTaken(result: VideoResult) {
                 super.onVideoTaken(result)
-
+                Toast.makeText(
+                    activity,
+                    "Picture saved to " + result.getFile().getPath(),
+                    Toast.LENGTH_LONG
+                ).show()
                 // refresh gallery
                 MediaScannerConnection.scanFile(
                     activity,
@@ -192,6 +202,10 @@ class Camera5Fragment :BaseBindingFragment<FragmentCamera5Binding, MainViewModel
         })
         binding.camera.snapshotMaxHeight = binding.camera.height
 
+        binding.camera.setFilter( MultiFilter(Filters.BRIGHTNESS.newInstance(), Filters.NONE.newInstance()))
+
+
+        //tỉ lệ khung hình
 //        binding.camera.apply {
 //            layoutParams = layoutParams.apply {
 //                if (this is ConstraintLayout.LayoutParams) {
@@ -201,6 +215,20 @@ class Camera5Fragment :BaseBindingFragment<FragmentCamera5Binding, MainViewModel
 //            }
 //        }
     }
+    fun initOutputSize(){
+        val width: SizeSelector = SizeSelectors.minWidth(1000)
+        val height: SizeSelector = SizeSelectors.minHeight(3000)
+        val dimensions: SizeSelector = SizeSelectors.and(width, height)
+        val ratio: SizeSelector = SizeSelectors.aspectRatio(AspectRatio.of(9, 16), 0F)
+
+        val result: SizeSelector = SizeSelectors.or(
+            SizeSelectors.and(ratio, dimensions),
+            ratio,
+            SizeSelectors.biggest()
+        )
+        binding.camera.setPictureSize(result)
+        binding.camera.setVideoSize(result);
+    }
 
     fun captureVideoSnapshot() {
         if (binding.camera.isTakingVideo()) {
@@ -208,17 +236,20 @@ class Camera5Fragment :BaseBindingFragment<FragmentCamera5Binding, MainViewModel
             binding.fabVideo.setImageResource(R.drawable.ic_videocam_black_24dp)
             return
         }
-        val dateFormat = SimpleDateFormat("yyyyMMdd_HH_mm_ss", Locale.US)
-        val currentTimeStamp = dateFormat.format(Date())
+       loadBitmapLocation(){
+           val dateFormat = SimpleDateFormat("yyyyMMdd_HH_mm_ss", Locale.US)
+           val currentTimeStamp = dateFormat.format(Date())
 
-        val path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
-            .toString() + File.separator + "CameraViewFreeDrawing"
-        val outputDir = File(path)
-        outputDir.mkdirs()
-        val saveTo = File(path + File.separator + currentTimeStamp + ".mp4")
-        binding.camera.takeVideoSnapshot(saveTo)
+           val path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
+               .toString() + File.separator + "CameraViewFreeDrawing"
+           val outputDir = File(path)
+           outputDir.mkdirs()
+           val saveTo = File(path + File.separator + currentTimeStamp + ".mp4")
+           binding.camera.takeVideoSnapshot(saveTo)
 
-        binding.fabVideo.setImageResource(R.drawable.ic_stop_black_24dp)
+           binding.fabVideo.setImageResource(R.drawable.ic_stop_black_24dp)
+       }
+
     }
 
     fun capturePictureSnapshot() {
@@ -226,7 +257,10 @@ class Camera5Fragment :BaseBindingFragment<FragmentCamera5Binding, MainViewModel
             Toast.makeText(activity, "Already taking video.", Toast.LENGTH_SHORT).show()
             return
         }
-        binding.camera.takePictureSnapshot()
+        loadBitmapLocation(){
+            binding.camera.takePictureSnapshot()
+        }
+
     }
 
     fun toggleCamera() {
@@ -261,9 +295,9 @@ class Camera5Fragment :BaseBindingFragment<FragmentCamera5Binding, MainViewModel
         map.moveCamera(CameraUpdateFactory.zoomTo(zoomLevel))
         Log.d("Haibq", "onMapReady: 111")
         moveToCurrentLocation(map)
-        map.setOnCameraIdleListener {
-        }
-        loadBitmapLocation()
+
+        handler.removeCallbacks(loadMapImageRunnable)
+        handler.postDelayed(loadMapImageRunnable, 5000)
     }
     fun moveToCurrentLocation(googleMap: GoogleMap) {
         val fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity())
@@ -317,16 +351,16 @@ class Camera5Fragment :BaseBindingFragment<FragmentCamera5Binding, MainViewModel
             e.printStackTrace()
         }
     }
-    fun loadBitmapLocation() {
-        Utils.safeDelay(3000) {
+
+    fun loadBitmapLocation(onCompletion: () -> Unit) {
             googleMap?.snapshot { mapBitmap ->
                 if (mapBitmap != null) {
-                    binding.imMapSnapshot.setImageBitmap(mapBitmap)
                     binding.imMapSnapshot.visibility = View.VISIBLE
+                    binding.imMapSnapshot.setImageBitmap(mapBitmap)
+                    markOverlayDirty()
                     Log.e("NVQ","loadBitmapLocation11111")
+                    onCompletion()
                 }
             }
-        }
-
     }
 }

@@ -164,8 +164,10 @@ public abstract class BaseFilter implements Filter {
     }
 
     protected void onPreDraw(long timestampUs, @NonNull float[] transformMatrix) {
-        program.setTextureTransform(transformMatrix);
-        program.onPreDraw(programDrawable, programDrawable.getModelMatrix());
+        try {
+            program.setTextureTransform(transformMatrix);
+            program.onPreDraw(programDrawable, programDrawable.getModelMatrix());
+        } catch (Throwable ignore){}
     }
 
     @SuppressWarnings("WeakerAccess")

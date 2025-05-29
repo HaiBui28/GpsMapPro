@@ -62,9 +62,9 @@ public class OverlayDrawer {
      * drawn contents to a GLES texture.
      * @param target the target
      */
-    private volatile boolean overlayDirty = true;
+    private static volatile boolean overlayDirty = true;
 
-    public void markOverlayDirty() {
+    public static void markOverlayDirty() {
         overlayDirty = true;
     }
     public void draw(@NonNull Overlay.Target target) {

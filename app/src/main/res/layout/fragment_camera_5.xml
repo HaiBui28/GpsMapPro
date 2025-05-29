@@ -20,6 +20,7 @@
             android:keepScreenOn="true"
             app:cameraAudio="on"
             app:cameraHdr="on"
+            app:cameraVideoMaxDuration="0"
             app:cameraPreviewFrameRate="23"
             app:cameraPreviewFrameRateExact="true"
             app:cameraVideoBitRate="32000000"
@@ -30,8 +31,7 @@
             app:cameraEngine="camera2"
             app:cameraPreview="glSurface"
             app:cameraGesturePinch="zoom"
-            app:cameraGestureScrollHorizontal="zoom"
-            app:cameraGestureScrollVertical="zoom">
+            app:cameraGestureScrollVertical="filterControl1">
             <androidx.constraintlayout.widget.ConstraintLayout
                 android:id="@+id/layoutOverlay"
                 android:layout_width="match_parent"
@@ -47,9 +47,6 @@
                     app:layout_constraintEnd_toEndOf="parent"
                     app:layout_constraintBottom_toBottomOf="parent"
                     android:layout_margin="10dp"
-                    app:layout_drawOnPreview="true"
-                    app:layout_drawOnPictureSnapshot="true"
-                    app:layout_drawOnVideoSnapshot="true"
                     >
 
                     <androidx.constraintlayout.widget.Guideline
@@ -67,16 +64,6 @@
                         app:layout_constraintDimensionRatio="1:1"
                         app:layout_constraintEnd_toStartOf="@+id/guideline"
                         app:layout_constraintStart_toStartOf="parent">
-
-                        <ImageView
-                            android:id="@+id/imMapSnapshot"
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:scaleType="centerCrop"
-                            android:translationZ="4dp"
-                            android:visibility="gone" />
-
-
                         <fragment xmlns:android="http://schemas.android.com/apk/res/android"
                             xmlns:map="http://schemas.android.com/apk/res-auto"
                             android:id="@+id/map"
@@ -86,6 +73,17 @@
                             map:cameraTilt="30"
                             map:uiRotateGestures="false"
                             map:uiZoomControls="false" />
+
+                        <ImageView
+                            android:id="@+id/imMapSnapshot"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:scaleType="centerCrop"
+                            android:translationZ="4dp"
+                            android:visibility="visible"/>
+
+
+
                     </androidx.cardview.widget.CardView>
 
                     <androidx.constraintlayout.widget.ConstraintLayout

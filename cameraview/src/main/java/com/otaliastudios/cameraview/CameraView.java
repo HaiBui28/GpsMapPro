@@ -18,6 +18,7 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -716,8 +717,9 @@ public class CameraView extends FrameLayout implements LifecycleObserver {
             case FILTER_CONTROL_1:
                 if (getFilter() instanceof OneParameterFilter) {
                     OneParameterFilter filter = (OneParameterFilter) getFilter();
-                    oldValue = filter.getParameter1();
-                    newValue = source.computeValue(oldValue, 0, 1);
+                    oldValue = filter.getParameter1() == 0f ? 1f : filter.getParameter1();
+                    newValue = source.computeValue(oldValue, 0.2f, 2f);
+                    Log.e("NVQ","35491384761354685 " +oldValue + " // " + newValue);
                     if (newValue != oldValue) {
                         filter.setParameter1(newValue);
                     }
