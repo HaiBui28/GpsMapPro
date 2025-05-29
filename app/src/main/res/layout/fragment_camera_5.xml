@@ -29,6 +29,7 @@
             app:cameraVideoCodec="h264"
             app:cameraAudioCodec="aac"
             app:cameraEngine="camera2"
+            app:cameraFilter="@string/cameraview_filter_brightness"
             app:cameraPreview="glSurface"
             app:cameraGesturePinch="zoom"
             app:cameraGestureScrollVertical="filterControl1">

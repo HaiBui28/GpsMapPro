@@ -207,9 +207,6 @@ class Camera5Fragment :BaseBindingFragment<FragmentCamera5Binding, MainViewModel
             }
         })
         binding.camera.snapshotMaxHeight = binding.camera.height
-        Utils.safeDelay(2000){
-            binding.camera.setFilter( MultiFilter(Filters.BRIGHTNESS.newInstance(), Filters.NONE.newInstance()))
-        }
 
 
         //tỉ lệ khung hình
