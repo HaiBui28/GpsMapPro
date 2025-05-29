@@ -32,7 +32,7 @@
             app:cameraFilter="@string/cameraview_filter_brightness"
             app:cameraPreview="glSurface"
             app:cameraGesturePinch="zoom"
-            app:cameraGestureScrollVertical="filterControl1">
+            app:cameraGestureScrollHorizontal="exposureCorrection">
             <androidx.constraintlayout.widget.ConstraintLayout
                 android:id="@+id/layoutOverlay"
                 android:layout_width="match_parent"
