@@ -153,14 +153,16 @@ public abstract class BaseFilter implements Filter {
 
     @Override
     public void draw(long timestampUs, @NonNull float[] transformMatrix) {
-        if (program == null) {
-            LOG.w("Filter.draw() called after destroying the filter. " +
-                    "This can happen rarely because of threading.");
-        } else {
-            onPreDraw(timestampUs, transformMatrix);
-            onDraw(timestampUs);
-            onPostDraw(timestampUs);
-        }
+        try {
+            if (program == null) {
+                LOG.w("Filter.draw() called after destroying the filter. " +
+                        "This can happen rarely because of threading.");
+            } else {
+                onPreDraw(timestampUs, transformMatrix);
+                onDraw(timestampUs);
+                onPostDraw(timestampUs);
+            }
+        } catch (Throwable ignore){}
     }
 
     protected void onPreDraw(long timestampUs, @NonNull float[] transformMatrix) {

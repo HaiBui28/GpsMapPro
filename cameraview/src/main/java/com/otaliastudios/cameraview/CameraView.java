@@ -719,7 +719,6 @@ public class CameraView extends FrameLayout implements LifecycleObserver {
                     OneParameterFilter filter = (OneParameterFilter) getFilter();
                     oldValue = filter.getParameter1() == 0f ? 1f : filter.getParameter1();
                     newValue = source.computeValue(oldValue, 0.2f, 2f);
-                    Log.e("NVQ","35491384761354685 " +oldValue + " // " + newValue);
                     if (newValue != oldValue) {
                         filter.setParameter1(newValue);
                     }

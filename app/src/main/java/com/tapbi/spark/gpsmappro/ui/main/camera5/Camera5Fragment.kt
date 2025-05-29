@@ -2,6 +2,7 @@ package com.tapbi.spark.gpsmappro.ui.main.camera5
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.location.Geocoder
 import android.media.MediaScannerConnection
 import android.net.Uri
@@ -28,6 +29,7 @@ import com.otaliastudios.cameraview.FileCallback
 import com.otaliastudios.cameraview.PictureResult
 import com.otaliastudios.cameraview.VideoResult
 import com.otaliastudios.cameraview.controls.Facing
+import com.otaliastudios.cameraview.controls.Grid
 import com.otaliastudios.cameraview.filter.Filters
 import com.otaliastudios.cameraview.filter.MultiFilter
 import com.otaliastudios.cameraview.filters.BrightnessFilter
@@ -44,6 +46,7 @@ import com.tapbi.spark.gpsmappro.feature.BalanceBarView.Companion.Rotation_3
 import com.tapbi.spark.gpsmappro.feature.BalanceBarView.Companion.Rotation_4
 import com.tapbi.spark.gpsmappro.ui.base.BaseBindingFragment
 import com.tapbi.spark.gpsmappro.ui.main.MainViewModel
+import com.tapbi.spark.gpsmappro.utils.Utils
 import com.tapbi.spark.gpsmappro.utils.Utils.dpToPx
 import com.tapbi.spark.gpsmappro.utils.clearAllConstraints
 import java.io.File
@@ -90,6 +93,9 @@ class Camera5Fragment :BaseBindingFragment<FragmentCamera5Binding, MainViewModel
         binding.fabVideo.setOnClickListener { captureVideoSnapshot() }
         binding.fabPicture.setOnClickListener { capturePictureSnapshot() }
         binding.fabFront.setOnClickListener {toggleCamera()}
+        binding.fabGrid.setOnClickListener {
+            binding.camera.grid = Grid.DRAW_3X3
+        }
     }
     private fun initChangeRotation() {
         binding.balanceBarView.setRotationListener(object : BalanceBarView.RotationListener {
@@ -201,8 +207,9 @@ class Camera5Fragment :BaseBindingFragment<FragmentCamera5Binding, MainViewModel
             }
         })
         binding.camera.snapshotMaxHeight = binding.camera.height
-
-        binding.camera.setFilter( MultiFilter(Filters.BRIGHTNESS.newInstance(), Filters.NONE.newInstance()))
+        Utils.safeDelay(2000){
+            binding.camera.setFilter( MultiFilter(Filters.BRIGHTNESS.newInstance(), Filters.NONE.newInstance()))
+        }
 
 
         //tỉ lệ khung hình
