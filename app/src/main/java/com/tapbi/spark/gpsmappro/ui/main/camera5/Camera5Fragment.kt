@@ -1,15 +1,18 @@
 package com.tapbi.spark.gpsmappro.ui.main.camera5
 
 import android.Manifest
+import android.annotation.WorkerThread
+import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Color
 import android.location.Geocoder
+import android.media.Image
 import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import android.view.View
 import android.widget.Toast
@@ -17,6 +20,7 @@ import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.app.ActivityCompat
 import androidx.core.view.setMargins
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
@@ -24,15 +28,18 @@ import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
+import com.google.zxing.BinaryBitmap
+import com.google.zxing.ReaderException
+import com.google.zxing.common.HybridBinarizer
+import com.google.zxing.qrcode.QRCodeReader
 import com.otaliastudios.cameraview.CameraListener
 import com.otaliastudios.cameraview.FileCallback
 import com.otaliastudios.cameraview.PictureResult
 import com.otaliastudios.cameraview.VideoResult
 import com.otaliastudios.cameraview.controls.Facing
 import com.otaliastudios.cameraview.controls.Grid
-import com.otaliastudios.cameraview.filter.Filters
-import com.otaliastudios.cameraview.filter.MultiFilter
-import com.otaliastudios.cameraview.filters.BrightnessFilter
+import com.otaliastudios.cameraview.frame.Frame
+import com.otaliastudios.cameraview.frame.FrameProcessor
 import com.otaliastudios.cameraview.overlay.OverlayDrawer.markOverlayDirty
 import com.otaliastudios.cameraview.size.AspectRatio
 import com.otaliastudios.cameraview.size.SizeSelector
@@ -46,9 +53,12 @@ import com.tapbi.spark.gpsmappro.feature.BalanceBarView.Companion.Rotation_3
 import com.tapbi.spark.gpsmappro.feature.BalanceBarView.Companion.Rotation_4
 import com.tapbi.spark.gpsmappro.ui.base.BaseBindingFragment
 import com.tapbi.spark.gpsmappro.ui.main.MainViewModel
-import com.tapbi.spark.gpsmappro.utils.Utils
+import com.tapbi.spark.gpsmappro.utils.PlanarYUVLuminanceSource
 import com.tapbi.spark.gpsmappro.utils.Utils.dpToPx
 import com.tapbi.spark.gpsmappro.utils.clearAllConstraints
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
 import java.text.SimpleDateFormat
@@ -153,7 +163,45 @@ class Camera5Fragment :BaseBindingFragment<FragmentCamera5Binding, MainViewModel
             }
         }
     }
+    private var mQrReader: QRCodeReader? = null
+    private var lastAnalyzedTime = 0L
+    private val analyzeInterval = 1000L
+    private fun loadQrCode(){
+        mQrReader = QRCodeReader()
+        binding.camera.addFrameProcessor(object : FrameProcessor {
+            @WorkerThread
+            override fun process(frame: Frame) {
+               if (frame.getDataClass() === Image::class.java) {
+                   val currentTime = SystemClock.elapsedRealtime()
+                   if (currentTime - lastAnalyzedTime < analyzeInterval) return
+                   lastAnalyzedTime = currentTime
+                   val img: Image? = frame.getData()
+                       Log.e("NVQ","1235435185745321+++++")
+                       var rawResult: com.google.zxing.Result? = null
+                       try {
+                           if (img == null) throw NullPointerException("cannot be null")
+                           val buffer = img.getPlanes()[0].getBuffer()
+                           val data = ByteArray(buffer.remaining())
+                           buffer.get(data)
+                           val width = img.getWidth()
+                           val height = img.getHeight()
+                           val source = PlanarYUVLuminanceSource(data, width, height)
+                           val bitmap = BinaryBitmap(HybridBinarizer(source))
 
+                           rawResult = mQrReader?.decode(bitmap)
+                               onQRCodeRead(rawResult?.getText())
+
+                       } catch (ignored: Exception) { } finally {
+                           mQrReader?.reset()
+                           img?.close()
+                       }
+                }
+            }
+        })
+    }
+    fun onQRCodeRead(text: String?) {
+        Log.e("NVQ","text+++++++++: $text")
+    }
     private fun initCamera() {
         binding.camera.setLifecycleOwner(viewLifecycleOwner)
         binding.camera.addCameraListener(object : CameraListener() {
@@ -207,7 +255,7 @@ class Camera5Fragment :BaseBindingFragment<FragmentCamera5Binding, MainViewModel
             }
         })
         binding.camera.snapshotMaxHeight = binding.camera.height
-
+        loadQrCode()
 
         //tỉ lệ khung hình
 //        binding.camera.apply {
