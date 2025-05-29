@@ -3,3 +3,4 @@ rootProject.name = "GpsMapPro"
 include ':app'
 include ':gpuv'
 include ':library'
+include ':cameraview'

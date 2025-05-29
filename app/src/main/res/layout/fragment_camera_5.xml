@@ -21,9 +21,12 @@
             app:cameraAudio="on"
             app:cameraHdr="on"
             app:cameraPreviewFrameRate="23"
-            app:cameraVideoBitRate="25000000"
+            app:cameraPreviewFrameRateExact="true"
+            app:cameraVideoBitRate="32000000"
             app:cameraAudioBitRate="128000"
             app:cameraExperimental="true"
+            app:cameraVideoCodec="h264"
+            app:cameraAudioCodec="aac"
             app:cameraEngine="camera2"
             app:cameraPreview="glSurface"
             app:cameraGesturePinch="zoom"
@@ -46,7 +49,8 @@
                     android:layout_margin="10dp"
                     app:layout_drawOnPreview="true"
                     app:layout_drawOnPictureSnapshot="true"
-                    app:layout_drawOnVideoSnapshot="true">
+                    app:layout_drawOnVideoSnapshot="true"
+                    >
 
                     <androidx.constraintlayout.widget.Guideline
                         android:id="@+id/guideline"
