@@ -4,19 +4,29 @@ import android.Manifest
 import android.app.ActionBar.LayoutParams
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.Color
+import android.location.Location
 import android.os.Bundle
+import android.os.Looper
 import android.provider.MediaStore
 import android.util.Log
 import android.view.View
 import android.widget.Button
 import androidx.core.app.ActivityCompat
 import androidx.core.net.toUri
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
+import com.google.android.gms.maps.model.Circle
+import com.google.android.gms.maps.model.CircleOptions
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.material.bottomsheet.BottomSheetDialog
@@ -29,6 +39,9 @@ import java.io.IOException
 class GoogleMapFragment : BaseBindingFragment<FragmentGoogleMapBinding, GoogleMapViewModel>(),
     OnMapReadyCallback {
     private var googleMap: GoogleMap? = null
+    private var latLng = LatLng(0.0, 0.0)
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
+    private lateinit var locationCallback: LocationCallback
     override fun getViewModel(): Class<GoogleMapViewModel> {
         return GoogleMapViewModel::class.java
     }
@@ -38,6 +51,7 @@ class GoogleMapFragment : BaseBindingFragment<FragmentGoogleMapBinding, GoogleMa
 
     override fun onCreatedView(view: View?, savedInstanceState: Bundle?) {
         initGoogleMap()
+        startListeningLocationUpdates()
     }
 
     private fun initGoogleMap() {
@@ -89,6 +103,7 @@ class GoogleMapFragment : BaseBindingFragment<FragmentGoogleMapBinding, GoogleMa
             fusedLocationClient.lastLocation.addOnSuccessListener { location ->
                 if (location != null) {
                     val latLng = LatLng(location.latitude, location.longitude)
+                    this.latLng = latLng
                     googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 16f))
 //                        googleMap.addMarker(
 //                            MarkerOptions()
@@ -116,7 +131,32 @@ class GoogleMapFragment : BaseBindingFragment<FragmentGoogleMapBinding, GoogleMa
             }
         }
     }
+    private fun startListeningLocationUpdates() {
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireContext())
 
+        val locationRequest = LocationRequest.create().apply {
+            interval = 5000 // thời gian lặp: 5s
+            fastestInterval = 2000
+            priority = Priority.PRIORITY_HIGH_ACCURACY
+        }
+
+        locationCallback = object : LocationCallback() {
+            override fun onLocationResult(result: LocationResult) {
+                super.onLocationResult(result)
+                val location = result.lastLocation ?: return
+                val latLng = LatLng(location.latitude, location.longitude)
+                Log.d("Haibq", "onLocationResult: ưee")
+            }
+        }
+
+        if (ActivityCompat.checkSelfPermission(
+                requireContext(),
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper())
+        }
+    }
     override fun onMapReady(map: GoogleMap) {
         this.googleMap = map
         map.mapType = GoogleMap.MAP_TYPE_NORMAL
@@ -125,7 +165,24 @@ class GoogleMapFragment : BaseBindingFragment<FragmentGoogleMapBinding, GoogleMa
         map.uiSettings.isCompassEnabled = true
         addMarker(map)
         moveToCurrentLocation(map)
+        var circle: Circle?=null
+        map.setOnCameraIdleListener {
+            val center = map.cameraPosition.target
+            if (circle == null){
+                val circleOptions = CircleOptions()
+                circleOptions.fillColor(Color.parseColor("#c8cfc5"))
+                circleOptions.center(center)
+                circleOptions.radius(100.0)
+                circleOptions.strokeWidth(1f)
+                circle = map.addCircle(circleOptions)
+            }else{
+                circle?.center = center
+            }
+            val a = isPointInCircle(center,100.0,latLng)
+            Log.d("Haibq", "onMapReady: "+a)
+        }
         map.setOnMarkerClickListener { marker ->
+
             // Xử lý sự kiện click ở đây
             Log.d("MarkerClick", "Clicked on: ${marker.title}")
 
@@ -134,9 +191,17 @@ class GoogleMapFragment : BaseBindingFragment<FragmentGoogleMapBinding, GoogleMa
             true
         }
     }
-
+    fun isPointInCircle(center: LatLng, radiusInMeters: Double, point: LatLng): Boolean {
+        val result = FloatArray(1)
+        Location.distanceBetween(
+            center.latitude, center.longitude,
+            point.latitude, point.longitude,
+            result
+        )
+        return result[0] <= radiusInMeters
+    }
     private fun addMarker(googleMap: GoogleMap) {
-        for (i in App.instance?.foldersMap!!){
+            for (i in App.instance?.foldersMap!!){
             val bitmap = MediaStore.Images.Media.getBitmap(context?.contentResolver, i.uriPreview?.toUri())
             val resizedBitmap = Bitmap.createScaledBitmap(bitmap, 100, 100, false)
             val descriptor = BitmapDescriptorFactory.fromBitmap(resizedBitmap)
