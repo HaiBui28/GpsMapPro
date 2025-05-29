@@ -66,6 +66,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.doOnLayout
 import androidx.core.view.drawToBitmap
 import androidx.core.view.setMargins
+import androidx.exifinterface.media.ExifInterface
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.location.LocationServices
@@ -91,6 +92,7 @@ import com.tapbi.spark.gpsmappro.ui.base.BaseBindingFragment
 import com.tapbi.spark.gpsmappro.ui.main.MainActivity
 import com.tapbi.spark.gpsmappro.ui.main.MainActivity.Companion.ACCESS_FINE_LOCATION_REQUEST_CODE
 import com.tapbi.spark.gpsmappro.ui.main.MainViewModel
+import com.tapbi.spark.gpsmappro.utils.MediaUtil
 import com.tapbi.spark.gpsmappro.utils.SimpleLocationManager
 import com.tapbi.spark.gpsmappro.utils.Utils.dpToPx
 import com.tapbi.spark.gpsmappro.utils.Utils.mergeBitmaps
@@ -433,11 +435,63 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
             throwable.printStackTrace()
         }.apply {
             setOnDrawListener { frame ->
-                val canvas = frame.overlayCanvas
-                canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
-                overlayBitmap?.let { it1->
-                    val destRect = Rect(0, 0, it1.width, it1.height)
-                    canvas.drawBitmap(it1, null, destRect, null)
+                val canvas = frame.overlayCanvas.apply {
+                    drawColor(Color.TRANSPARENT)
+                }
+
+                // 1. Tạo transformation matrix thủ công
+                val matrix = Matrix()
+                val viewRatio = binding.previewView.width.toFloat() / binding.previewView.height.toFloat()
+                val bufferRatio = frame.size.width.toFloat() / frame.size.height.toFloat()
+
+                if (bufferRatio > viewRatio) {
+                    // Crop theo chiều ngang
+                    val scale = binding.previewView.height.toFloat() / frame.size.height.toFloat()
+                    matrix.postScale(scale, scale)
+                    matrix.postTranslate(
+                        (binding.previewView.width - frame.size.width * scale) / 2f,
+                        0f
+                    )
+                } else {
+                    // Crop theo chiều dọc
+                    val scale = binding.previewView.width.toFloat() / frame.size.width.toFloat()
+                    matrix.postScale(scale, scale)
+                    matrix.postTranslate(
+                        0f,
+                        (binding.previewView.height - frame.size.height * scale) / 2f
+                    )
+                }
+
+                // 2. Áp dụng cho tọa độ
+                val squareSize = 600f
+                val marginBottom = 100f
+                val points = floatArrayOf(
+                    frame.size.width / 2f - squareSize/2,  // left
+                    frame.size.height - marginBottom - squareSize, // top
+                    frame.size.width / 2f + squareSize/2,  // right
+                    frame.size.height - marginBottom       // bottom
+                )
+                matrix.mapPoints(points)
+
+                // 3. Vẽ hình vuông đã transform
+                Paint().apply {
+                    color = Color.RED
+                    style = Paint.Style.STROKE
+                    strokeWidth = 20f
+                    canvas.drawRect(
+                        points[0], points[1],  // left, top
+                        points[2], points[3],  // right, bottom
+                        this
+                    )
+                }
+
+                // 4. Debug bằng điểm màu xanh
+                Paint().apply {
+                    color = Color.BLUE
+                    style = Paint.Style.FILL
+                    val center = floatArrayOf(frame.size.width/2f, frame.size.height - marginBottom)
+                    matrix.mapPoints(center)
+                    canvas.drawCircle(center[0], center[1], 30f, this)
                 }
 
                 true

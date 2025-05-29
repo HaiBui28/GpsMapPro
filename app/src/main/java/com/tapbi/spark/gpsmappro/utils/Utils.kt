@@ -9,10 +9,13 @@ import android.graphics.ImageFormat
 import android.graphics.Matrix
 import android.graphics.Rect
 import android.graphics.YuvImage
+import android.os.Handler
+import android.os.Looper
 import androidx.camera.core.ImageProxy
 import com.tapbi.spark.gpsmappro.feature.BalanceBarView.Companion.Rotation_2
 import com.tapbi.spark.gpsmappro.feature.BalanceBarView.Companion.Rotation_3
 import com.tapbi.spark.gpsmappro.feature.BalanceBarView.Companion.Rotation_4
+import timber.log.Timber
 import java.io.ByteArrayOutputStream
 import kotlin.math.roundToInt
 
@@ -141,5 +144,14 @@ object Utils {
         val canvas = Canvas(resultBitmap)
         canvas.drawBitmap(overlayBitmap, x, y, null)
         return resultBitmap
+    }
+    fun safeDelay(delayMillis: Long = 0, action: () -> Unit) {
+        Handler(Looper.getMainLooper()).postDelayed({
+            try {
+                action()
+            } catch (e: java.lang.Exception) {
+                Timber.e("safeDelay: $e")
+            }
+        }, delayMillis)
     }
 }

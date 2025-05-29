@@ -21,6 +21,7 @@ buildscript {
         classpath "androidx.navigation:navigation-safe-args-gradle-plugin:$versions.androidxNavigationVersion"
         classpath "com.google.android.libraries.mapsplatform.secrets-gradle-plugin:secrets-gradle-plugin:2.0.1"
         classpath 'com.github.dcendents:android-maven-gradle-plugin:2.1'
+        classpath("io.deepmedia.tools:publisher:0.6.0")
     }
 }
 
