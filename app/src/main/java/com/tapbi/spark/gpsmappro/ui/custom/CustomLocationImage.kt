@@ -29,10 +29,8 @@ class CustomLocationImage : View {
         this.uriImage = uri
     }
 
-    //    fun setWidthHeight(width: Int, height: Int){
-//        this.width = width
-//        this.height = height
-//    }
+        fun setWidthHeight(width: Int, height: Int){
+    }
     constructor(context: Context?) : super(context) {
         initData()
     }

@@ -1,6 +1,7 @@
 package com.tapbi.spark.gpsmappro.ui.main.camera5
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.annotation.WorkerThread
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -169,9 +170,10 @@ class Camera5Fragment :BaseBindingFragment<FragmentCamera5Binding, MainViewModel
     private fun loadQrCode(){
         mQrReader = QRCodeReader()
         binding.camera.addFrameProcessor(object : FrameProcessor {
+            @SuppressLint("SuspiciousIndentation")
             @WorkerThread
             override fun process(frame: Frame) {
-               if (frame.getDataClass() === Image::class.java) {
+               if (frame.getDataClass() === Image::class.java && !binding.camera.isTakingVideo) {
                    val currentTime = SystemClock.elapsedRealtime()
                    if (currentTime - lastAnalyzedTime < analyzeInterval) return
                    lastAnalyzedTime = currentTime
