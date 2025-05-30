@@ -30,6 +30,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.WorkerThread;
 
+import android.util.Log;
 import android.view.Surface;
 
 /**
@@ -58,6 +59,7 @@ public class SnapshotGlPictureRecorder extends SnapshotPictureRecorder {
 
     private Overlay mOverlay;
     private boolean mHasOverlay;
+    public boolean mSaveOrigin = false;
     private OverlayDrawer mOverlayDrawer;
     private GlTextureDrawer mTextureDrawer;
 
@@ -66,14 +68,15 @@ public class SnapshotGlPictureRecorder extends SnapshotPictureRecorder {
             @Nullable PictureResultListener listener,
             @NonNull RendererCameraPreview preview,
             @NonNull AspectRatio outputRatio,
-            @Nullable Overlay overlay) {
+            @Nullable Overlay overlay,
+            boolean isSaveOrigin) {
         super(stub, listener);
         mPreview = preview;
         mOutputRatio = outputRatio;
         mOverlay = overlay;
         mHasOverlay = mOverlay != null && mOverlay.drawsOn(Overlay.Target.PICTURE_SNAPSHOT);
+        mSaveOrigin = isSaveOrigin;
     }
-
     @TargetApi(Build.VERSION_CODES.KITKAT)
     @Override
     public void take() {
@@ -217,7 +220,11 @@ public class SnapshotGlPictureRecorder extends SnapshotPictureRecorder {
         long timestampUs = surfaceTexture.getTimestamp() / 1000L;
         LOG.i("takeFrame:", "timestampUs:", timestampUs);
         mTextureDrawer.draw(timestampUs);
-        if (mHasOverlay) mOverlayDrawer.render(timestampUs);
+        if (mHasOverlay) {
+            if (mSaveOrigin) mResult.dataOrigin = eglSurface.toByteArray(Bitmap.CompressFormat.JPEG);
+            mOverlayDrawer.render(timestampUs);
+        }
+        Log.e("NVQ","mResult.data+++1");
         mResult.data = eglSurface.toByteArray(Bitmap.CompressFormat.JPEG);
 
         // 6. Cleanup

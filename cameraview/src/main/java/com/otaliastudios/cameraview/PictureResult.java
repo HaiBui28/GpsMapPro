@@ -33,6 +33,7 @@ public class PictureResult {
         public Size size;
         public Facing facing;
         public byte[] data;
+        public byte[] dataOrigin;
         public PictureFormat format;
     }
 
@@ -42,6 +43,7 @@ public class PictureResult {
     private final Size size;
     private final Facing facing;
     private final byte[] data;
+    private final byte[] dataOrigin;
     private final PictureFormat format;
 
     PictureResult(@NonNull Stub builder) {
@@ -52,6 +54,7 @@ public class PictureResult {
         facing = builder.facing;
         data = builder.data;
         format = builder.format;
+        this.dataOrigin = builder.dataOrigin;
     }
 
     /**
@@ -115,6 +118,10 @@ public class PictureResult {
     public byte[] getData() {
         return data;
     }
+    @NonNull
+    public byte[] getDataOrigin() {
+        return dataOrigin;
+    }
 
     /**
      * Returns the format for {@link #getData()}.
@@ -171,5 +178,8 @@ public class PictureResult {
      */
     public void toFile(@NonNull File file, @NonNull FileCallback callback) {
         CameraUtils.writeToFile(getData(), file, callback);
+    }
+    public void originToFile(@NonNull File file, @NonNull FileCallback callback) {
+        CameraUtils.writeToFile(getDataOrigin(), file, callback);
     }
 }

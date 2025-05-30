@@ -8,8 +8,6 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
-import android.graphics.PointF
-import android.graphics.RectF
 import android.util.AttributeSet
 import android.util.Log
 import android.view.View
@@ -22,17 +20,18 @@ class CustomLocationImage : View {
     val paint: Paint = Paint()
     val path: Path = Path()
 
-        private var width = 100
+    private var width = 100
     private var height = 100
     private var uriImage: String = ""
     fun setImageUrl(uri: String) {
         this.uriImage = uri
     }
 
-        fun setWidthHeight(width: Int, height: Int){
+    fun setWidthHeight(width: Int, height: Int) {
         this.width = width
         this.height = height
     }
+
     constructor(context: Context?) : super(context) {
         initData()
     }
@@ -113,9 +112,11 @@ class CustomLocationImage : View {
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
 
     }
+
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         setMeasuredDimension(width, height)
     }
+
     override fun draw(canvas: Canvas) {
         super.draw(canvas)
         Log.d("Haibq", "draw: " + width)

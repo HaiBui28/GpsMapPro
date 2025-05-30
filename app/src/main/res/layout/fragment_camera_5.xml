@@ -32,6 +32,11 @@
             app:cameraFilter="@string/cameraview_filter_brightness"
             app:cameraPreview="glSurface"
             app:cameraGesturePinch="zoom"
+            app:cameraGestureTap="autoFocus"
+            app:cameraGestureLongTap="none"
+            app:cameraMode="picture"
+            app:cameraAutoFocusMarker="@string/cameraview_default_autofocus_marker"
+            app:cameraFacing="back"
             app:cameraGestureScrollHorizontal="exposureCorrection">
             <androidx.constraintlayout.widget.ConstraintLayout
                 android:id="@+id/layoutOverlay"

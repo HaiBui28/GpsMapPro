@@ -386,14 +386,14 @@ public class Camera1Engine extends CameraBaseEngine implements
     @Override
     protected void onTakePictureSnapshot(@NonNull PictureResult.Stub stub,
                                          @NonNull AspectRatio outputRatio,
-                                         boolean doMetering) {
+                                         boolean doMetering,boolean mSaveOrigin) {
         LOG.i("onTakePictureSnapshot:", "executing.");
         // Not the real size: it will be cropped to match the view ratio
         stub.size = getUncroppedSnapshotSize(Reference.OUTPUT);
         if (mPreview instanceof RendererCameraPreview && Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
             stub.rotation = getAngles().offset(Reference.VIEW, Reference.OUTPUT, Axis.ABSOLUTE);
             mPictureRecorder = new SnapshotGlPictureRecorder(stub, this,
-                    (RendererCameraPreview) mPreview, outputRatio, getOverlay());
+                    (RendererCameraPreview) mPreview, outputRatio, getOverlay(),mSaveOrigin);
         } else {
             stub.rotation = getAngles().offset(Reference.SENSOR, Reference.OUTPUT, Axis.RELATIVE_TO_SENSOR);
             mPictureRecorder = new Snapshot1PictureRecorder(stub, this, mCamera, outputRatio);

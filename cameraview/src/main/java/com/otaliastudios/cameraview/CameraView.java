@@ -1741,8 +1741,13 @@ public class CameraView extends FrameLayout implements LifecycleObserver {
      */
     public void takePictureSnapshot() {
         PictureResult.Stub stub = new PictureResult.Stub();
-        mCameraEngine.takePictureSnapshot(stub);
+        mCameraEngine.takePictureSnapshot(stub,false);
     }
+    public void takePictureSnapshot(boolean mSaveOrigin) {
+        PictureResult.Stub stub = new PictureResult.Stub();
+        mCameraEngine.takePictureSnapshot(stub,mSaveOrigin);
+    }
+
 
     /**
      * Starts recording a video. Video will be written to the given file,
