@@ -11,6 +11,8 @@ import android.graphics.Rect
 import android.graphics.YuvImage
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
+import android.view.View
 import androidx.camera.core.ImageProxy
 import com.tapbi.spark.gpsmappro.feature.BalanceBarView.Companion.Rotation_2
 import com.tapbi.spark.gpsmappro.feature.BalanceBarView.Companion.Rotation_3
@@ -36,7 +38,25 @@ object Utils {
         }
         return 0
     }
+    fun getWidthScreen(): Int {
+        return Resources.getSystem().displayMetrics.widthPixels
+    }
 
+    fun getHeightScreen(): Int {
+        return Resources.getSystem().displayMetrics.heightPixels
+    }
+    fun getViewBitmap(view: View, targetWidth: Int, targetHeight: Int): Bitmap {
+        // Đo và layout với kích thước cụ thể
+        val widthSpec = View.MeasureSpec.makeMeasureSpec(targetWidth, View.MeasureSpec.EXACTLY)
+        val heightSpec = View.MeasureSpec.makeMeasureSpec(targetHeight, View.MeasureSpec.EXACTLY)
+        view.measure(widthSpec, heightSpec)
+        view.layout(0, 0, targetWidth, targetHeight)
+
+        val bitmap = Bitmap.createBitmap(targetWidth, targetHeight, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        view.draw(canvas)
+        return bitmap
+    }
     fun getNavigationBarHeight(context: Context): Int {
         val isNavigationBar = context.resources.getBoolean(
             context.resources.getIdentifier(

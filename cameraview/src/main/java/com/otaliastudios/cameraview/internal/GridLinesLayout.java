@@ -22,7 +22,7 @@ import com.otaliastudios.cameraview.controls.Grid;
 public class GridLinesLayout extends View {
 
     private final static float GOLDEN_RATIO_INV = 0.61803398874989f;
-    public final static int DEFAULT_COLOR = Color.argb(160, 255, 255, 255);
+    public final static int DEFAULT_COLOR = Color.WHITE;
 
     private Grid gridMode;
     private int gridColor = DEFAULT_COLOR;
@@ -45,7 +45,7 @@ public class GridLinesLayout extends View {
         super(context, attrs);
         horiz = new ColorDrawable(gridColor);
         vert = new ColorDrawable(gridColor);
-        width = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 0.9f,
+        width = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 2f,
                 context.getResources().getDisplayMetrics());
     }
 

@@ -50,6 +50,7 @@ class MainActivity : BaseBindingActivity<ActivityMainBinding, MainViewModel>() {
     }
 
     override fun setupView(savedInstanceState: Bundle?) {
+        requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),11111)
         App.statusBarHeight = Utils.getStatusBarHeight(this)
         verifyStoragePermissions(this)
         val navHostFragment =

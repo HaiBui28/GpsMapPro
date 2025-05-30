@@ -459,13 +459,12 @@ public class Camera2Engine extends CameraBaseEngine implements
                     } else {
                         // This happened while the engine is running. Throw unrecoverable exception
                         // so that engine is properly destroyed.
-                        LOG.e("CameraDevice.StateCallback reported an error:", error);
                         throw new CameraException(CameraException.REASON_DISCONNECTED);
                     }
                 }
             }, null);
         } catch (CameraAccessException e) {
-            throw createCameraException(e);
+//            throw createCameraException(e);
         }
         return task.getTask();
     }
@@ -786,7 +785,7 @@ public class Camera2Engine extends CameraBaseEngine implements
     @Override
     protected void onTakePictureSnapshot(@NonNull final PictureResult.Stub stub,
                                          @NonNull final AspectRatio outputRatio,
-                                         boolean doMetering) {
+                                         boolean doMetering,boolean mSaveOrigin) {
         if (doMetering) {
             LOG.i("onTakePictureSnapshot:", "doMetering is true. Delaying.");
             Action action = Actions.timeout(METER_TIMEOUT_SHORT, createMeterAction(null));
@@ -795,7 +794,7 @@ public class Camera2Engine extends CameraBaseEngine implements
                 protected void onActionCompleted(@NonNull Action action) {
                     // This is called on any thread, so be careful.
                     setPictureSnapshotMetering(false);
-                    takePictureSnapshot(stub);
+                    takePictureSnapshot(stub,mSaveOrigin);
                     setPictureSnapshotMetering(true);
                 }
             });
@@ -811,7 +810,7 @@ public class Camera2Engine extends CameraBaseEngine implements
             stub.size = getUncroppedSnapshotSize(Reference.OUTPUT);
             stub.rotation = getAngles().offset(Reference.VIEW, Reference.OUTPUT, Axis.ABSOLUTE);
             mPictureRecorder = new Snapshot2PictureRecorder(stub, this,
-                    (RendererCameraPreview) mPreview, outputRatio);
+                    (RendererCameraPreview) mPreview, outputRatio,mSaveOrigin);
             mPictureRecorder.take();
         }
     }
@@ -1675,6 +1674,5 @@ public class Camera2Engine extends CameraBaseEngine implements
             mSession.capture(builder.build(), mRepeatingRequestCallback, null);
         }
     }
-
     //endregion
 }

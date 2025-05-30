@@ -54,10 +54,14 @@ object MediaUtil {
                     }
                     val latLong = FloatArray(2)
                     if (exifInterface.getLatLong(latLong)) {
+                        Log.d("Haibq", "getDevicePhotosByFolder: true rêrtertrtrtrtrrt")
+                        val latStr = exifInterface.getAttribute(ExifInterface.TAG_GPS_LATITUDE)
+                        val lonStr = exifInterface.getAttribute(ExifInterface.TAG_GPS_LONGITUDE)
+                        Log.d("Haibq", "getDevicePhotosByFolder19: "+ latStr+"////"+ lonStr+"/+++"+ latLong[0]+"////"+ latLong[1])
                         val geocoder = Geocoder(context, Locale.getDefault())
                         val addresses = geocoder.getFromLocation(latLong[0].toDouble(), latLong[1].toDouble(), 1)
-                        Log.d("Haibq", "getDevicePhotosByFolder: "+ (addresses?.get(0)?.getAddressLine(0) == null))
                         val location = addresses?.get(0)?.getAddressLine(0)?:" "
+                        Log.d("Haibq", "getDevicePhotosByFolder: "+ location)
                           val photo =  PhotoModel(
                                 uri = contentUri.toString(),
                                 latLng = LatLng(latLong[0].toDouble(), latLong[1].toDouble()),
