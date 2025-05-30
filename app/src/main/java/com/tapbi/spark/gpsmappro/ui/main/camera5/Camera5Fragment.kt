@@ -44,9 +44,7 @@ import com.otaliastudios.cameraview.controls.Grid
 import com.otaliastudios.cameraview.frame.Frame
 import com.otaliastudios.cameraview.frame.FrameProcessor
 import com.otaliastudios.cameraview.overlay.OverlayDrawer.markOverlayDirty
-import com.otaliastudios.cameraview.size.AspectRatio
-import com.otaliastudios.cameraview.size.SizeSelector
-import com.otaliastudios.cameraview.size.SizeSelectors
+import com.tapbi.spark.gpsmappro.utils.Utils.safeDelay
 import com.tapbi.spark.gpsmappro.App
 import com.tapbi.spark.gpsmappro.R
 import com.tapbi.spark.gpsmappro.databinding.FragmentCamera5Binding
@@ -163,6 +161,9 @@ class Camera5Fragment :BaseBindingFragment<FragmentCamera5Binding, MainViewModel
                     }
                 }
                 layoutParams = it
+                safeDelay(600){
+                    markOverlayDirty()
+                }
             }
         }
     }
@@ -206,16 +207,28 @@ class Camera5Fragment :BaseBindingFragment<FragmentCamera5Binding, MainViewModel
     fun onQRCodeRead(text: String?) {
         Log.e("NVQ","text+++++++++: $text")
     }
+    private var isSaveOrigin = false
     private fun initCamera() {
         binding.camera.setLifecycleOwner(viewLifecycleOwner)
         binding.camera.addCameraListener(object : CameraListener() {
             override fun onPictureTaken(result: PictureResult) {
                 val dateFormat = SimpleDateFormat("yyyyMMdd_HH_mm_ss", Locale.US)
                 val currentTimeStamp = dateFormat.format(Date())
-
                 val path =
                     Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
                         .toString() + File.separator + "GpsMapPro"
+                if (isSaveOrigin){
+                    val originDir = File(path)
+                    originDir.mkdirs()
+                    val origin = File(path + File.separator + currentTimeStamp + "_origin.jpg")
+
+                    result.originToFile (origin){
+                        MediaScannerConnection.scanFile(
+                            activity,
+                            arrayOf<String>(it.toString()), null,
+                            MediaScannerConnection.OnScanCompletedListener { filePath: String?, uri: Uri? -> })
+                    }
+                }
                 val outputDir = File(path)
                 outputDir.mkdirs()
                 val saveTo = File(path + File.separator + currentTimeStamp + ".jpg")
@@ -301,8 +314,11 @@ class Camera5Fragment :BaseBindingFragment<FragmentCamera5Binding, MainViewModel
             return
         }
         loadBitmapLocation(){
-            binding.camera.takePictureSnapshot()
+            binding.camera.takePictureSnapshot(isSaveOrigin)
         }
+
+    }
+    fun captureOriginPicture() {
 
     }
 

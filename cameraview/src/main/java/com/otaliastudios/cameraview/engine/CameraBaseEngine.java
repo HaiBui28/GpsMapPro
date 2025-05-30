@@ -530,7 +530,7 @@ public abstract class CameraBaseEngine extends CameraEngine {
      * @param stub a picture stub
      */
     @Override
-    public /* final */ void takePictureSnapshot(final @NonNull PictureResult.Stub stub) {
+    public /* final */ void takePictureSnapshot(final @NonNull PictureResult.Stub stub,boolean mSaveOrigin) {
         // Save boolean before scheduling! See how Camera2Engine calls this with a temp value.
         final boolean metering = mPictureSnapshotMetering;
         getOrchestrator().scheduleStateful("take picture snapshot", CameraState.BIND,
@@ -546,7 +546,7 @@ public abstract class CameraBaseEngine extends CameraEngine {
                 // Leave the other parameters to subclasses.
                 //noinspection ConstantConditions
                 AspectRatio ratio = AspectRatio.of(getPreviewSurfaceSize(Reference.OUTPUT));
-                onTakePictureSnapshot(stub, ratio, metering);
+                onTakePictureSnapshot(stub, ratio, metering,mSaveOrigin);
             }
         });
     }
@@ -688,7 +688,7 @@ public abstract class CameraBaseEngine extends CameraEngine {
     @EngineThread
     protected abstract void onTakePictureSnapshot(@NonNull PictureResult.Stub stub,
                                                   @NonNull AspectRatio outputRatio,
-                                                  boolean doMetering);
+                                                  boolean doMetering,boolean mSaveOrigin);
 
     @EngineThread
     protected abstract void onTakeVideoSnapshot(@NonNull VideoResult.Stub stub,

@@ -715,7 +715,7 @@ public abstract class CameraEngine implements
 
     public abstract boolean isTakingPicture();
     public abstract void takePicture(@NonNull PictureResult.Stub stub);
-    public abstract void takePictureSnapshot(final @NonNull PictureResult.Stub stub);
+    public abstract void takePictureSnapshot(final @NonNull PictureResult.Stub stub,boolean mSaveOrigin);
 
     public abstract boolean isTakingVideo();
     public abstract void takeVideo(@NonNull VideoResult.Stub stub,
