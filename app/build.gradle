@@ -132,7 +132,7 @@ dependencies {
     implementation project(":gpuv")
     implementation project(":library")
     implementation project(":cameraview")
-    implementation 'com.google.zxing:core:3.2.0' //QRCode scanner
+    implementation 'com.google.zxing:core:3.5.2' //QRCode scanner
 
 //    api 'com.otaliastudios:cameraview:2.7.2'
     dependencies {

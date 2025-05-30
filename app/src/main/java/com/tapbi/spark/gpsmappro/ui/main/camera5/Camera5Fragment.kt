@@ -6,6 +6,7 @@ import android.annotation.WorkerThread
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Geocoder
+import android.location.Location
 import android.media.Image
 import android.media.MediaScannerConnection
 import android.net.Uri
@@ -20,6 +21,7 @@ import android.widget.Toast
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.app.ActivityCompat
 import androidx.core.view.setMargins
+import androidx.exifinterface.media.ExifInterface
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.location.LocationServices
@@ -68,6 +70,7 @@ import java.util.Locale
 
 class Camera5Fragment :BaseBindingFragment<FragmentCamera5Binding, MainViewModel>(),OnMapReadyCallback {
     private var googleMap: GoogleMap? = null
+    private var currentLocation : Location? = null
     var rotation = 0f
     val handler = Handler(Looper.getMainLooper())
     val runnable = Runnable {
@@ -121,7 +124,6 @@ class Camera5Fragment :BaseBindingFragment<FragmentCamera5Binding, MainViewModel
         })
     }
     fun loadMapRotation(rotation: Float) {
-
         binding.llMap.apply {
             val m10dp = dpToPx(10)
             val params = layoutParams as? ConstraintLayout.LayoutParams
@@ -182,11 +184,11 @@ class Camera5Fragment :BaseBindingFragment<FragmentCamera5Binding, MainViewModel
                        var rawResult: com.google.zxing.Result? = null
                        try {
                            if (img == null) throw NullPointerException("cannot be null")
-                           val buffer = img.getPlanes()[0].getBuffer()
+                           val buffer = img.planes[0].buffer
                            val data = ByteArray(buffer.remaining())
                            buffer.get(data)
-                           val width = img.getWidth()
-                           val height = img.getHeight()
+                           val width = img.width
+                           val height = img.height
                            val source = PlanarYUVLuminanceSource(data, width, height)
                            val bitmap = BinaryBitmap(HybridBinarizer(source))
 
@@ -213,13 +215,20 @@ class Camera5Fragment :BaseBindingFragment<FragmentCamera5Binding, MainViewModel
 
                 val path =
                     Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
-                        .toString() + File.separator + "CameraViewFreeDrawing"
+                        .toString() + File.separator + "GpsMapPro"
                 val outputDir = File(path)
                 outputDir.mkdirs()
                 val saveTo = File(path + File.separator + currentTimeStamp + ".jpg")
 
                 result.toFile(saveTo, FileCallback { file: File? ->
                         if (file != null) {
+                            if (currentLocation != null) {
+                                try {
+                                    val exif = ExifInterface(file.absolutePath)
+                                    exif.setGpsInfo(currentLocation)
+                                    exif.saveAttributes()
+                                } catch (e: Exception) { e.printStackTrace() }
+                            }
                             Toast.makeText(
                                 activity,
                                 "Picture saved to " + file.getPath(),
@@ -230,10 +239,7 @@ class Camera5Fragment :BaseBindingFragment<FragmentCamera5Binding, MainViewModel
                             MediaScannerConnection.scanFile(
                                 activity,
                                 arrayOf<String>(file.toString()), null,
-                                MediaScannerConnection.OnScanCompletedListener { filePath: String?, uri: Uri? ->
-                                    Log.i("ExternalStorage", "Scanned " + filePath + ":")
-                                    Log.i("ExternalStorage", "-> uri=" + uri)
-                                })
+                                MediaScannerConnection.OnScanCompletedListener { filePath: String?, uri: Uri? -> })
                         }
                     })
 
@@ -250,10 +256,7 @@ class Camera5Fragment :BaseBindingFragment<FragmentCamera5Binding, MainViewModel
                 MediaScannerConnection.scanFile(
                     activity,
                     arrayOf<String>(result.getFile().toString()), null,
-                    MediaScannerConnection.OnScanCompletedListener { filePath: String?, uri: Uri? ->
-                        Log.i("ExternalStorage", "Scanned " + filePath + ":")
-                        Log.i("ExternalStorage", "-> uri=" + uri)
-                    })
+                    MediaScannerConnection.OnScanCompletedListener { filePath: String?, uri: Uri? -> })
             }
         })
         binding.camera.snapshotMaxHeight = binding.camera.height
@@ -269,23 +272,9 @@ class Camera5Fragment :BaseBindingFragment<FragmentCamera5Binding, MainViewModel
 //            }
 //        }
     }
-    fun initOutputSize(){
-        val width: SizeSelector = SizeSelectors.minWidth(1000)
-        val height: SizeSelector = SizeSelectors.minHeight(3000)
-        val dimensions: SizeSelector = SizeSelectors.and(width, height)
-        val ratio: SizeSelector = SizeSelectors.aspectRatio(AspectRatio.of(9, 16), 0F)
-
-        val result: SizeSelector = SizeSelectors.or(
-            SizeSelectors.and(ratio, dimensions),
-            ratio,
-            SizeSelectors.biggest()
-        )
-        binding.camera.setPictureSize(result)
-        binding.camera.setVideoSize(result);
-    }
 
     fun captureVideoSnapshot() {
-        if (binding.camera.isTakingVideo()) {
+        if (binding.camera.isTakingVideo) {
             binding.camera.stopVideo()
             binding.fabVideo.setImageResource(R.drawable.ic_videocam_black_24dp)
             return
@@ -295,7 +284,7 @@ class Camera5Fragment :BaseBindingFragment<FragmentCamera5Binding, MainViewModel
            val currentTimeStamp = dateFormat.format(Date())
 
            val path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
-               .toString() + File.separator + "CameraViewFreeDrawing"
+               .toString() + File.separator + "GpsMapPro"
            val outputDir = File(path)
            outputDir.mkdirs()
            val saveTo = File(path + File.separator + currentTimeStamp + ".mp4")
@@ -307,7 +296,7 @@ class Camera5Fragment :BaseBindingFragment<FragmentCamera5Binding, MainViewModel
     }
 
     fun capturePictureSnapshot() {
-        if (binding.camera.isTakingVideo()) {
+        if (binding.camera.isTakingVideo) {
             Toast.makeText(activity, "Already taking video.", Toast.LENGTH_SHORT).show()
             return
         }
@@ -337,6 +326,14 @@ class Camera5Fragment :BaseBindingFragment<FragmentCamera5Binding, MainViewModel
 
     }
 
+    override fun onPause() {
+        if (binding.camera.isTakingVideo) {
+            binding.camera.stopVideo()
+            binding.fabVideo.setImageResource(R.drawable.ic_videocam_black_24dp)
+        }
+        super.onPause()
+    }
+
     override fun onMapReady(map: GoogleMap) {
         this.googleMap = map
         map.mapType = GoogleMap.MAP_TYPE_HYBRID
@@ -363,6 +360,8 @@ class Camera5Fragment :BaseBindingFragment<FragmentCamera5Binding, MainViewModel
 //            googleMap?.isMyLocationEnabled = true
             fusedLocationClient.lastLocation.addOnSuccessListener { location ->
                 if (location != null) {
+                    currentLocation = location
+                    binding.camera.location = location
                     val latLng = LatLng(location.latitude, location.longitude)
                     googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 16f))
                     googleMap.addMarker(
@@ -372,8 +371,7 @@ class Camera5Fragment :BaseBindingFragment<FragmentCamera5Binding, MainViewModel
                     )
                     try {
                         val geocoder = Geocoder(requireActivity(), Locale.getDefault())
-                        val addresses =
-                            geocoder.getFromLocation(location.latitude, location.longitude, 1)
+                        val addresses = geocoder.getFromLocation(location.latitude, location.longitude, 1)
                         getAddressFromLocation(location.latitude, location.longitude)
                         binding.tvLocation.text = addresses!![0].getAddressLine(0)
                     } catch (e: IOException) {
