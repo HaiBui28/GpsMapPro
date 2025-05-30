@@ -31,7 +31,7 @@
         android:name="com.tapbi.spark.gpsmappro.ui.main.googlemap.GoogleMapFragment"
         android:label="GoogleMapFragment" />
     <fragment
-        android:id="@+id/camera4Fragment"
+            android:id="@+id/camera4Fragment"
         android:name="com.tapbi.spark.gpsmappro.ui.main.camera4.Camera4Fragment"
         android:label="Camera4Fragment" />
     <fragment

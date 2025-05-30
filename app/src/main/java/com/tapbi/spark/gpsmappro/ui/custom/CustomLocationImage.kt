@@ -22,17 +22,17 @@ class CustomLocationImage : View {
     val paint: Paint = Paint()
     val path: Path = Path()
 
-    //    private var width = 100
-//    private var height = 100
+        private var width = 100
+    private var height = 100
     private var uriImage: String = ""
     fun setImageUrl(uri: String) {
         this.uriImage = uri
     }
 
-    //    fun setWidthHeight(width: Int, height: Int){
-//        this.width = width
-//        this.height = height
-//    }
+        fun setWidthHeight(width: Int, height: Int){
+        this.width = width
+        this.height = height
+    }
     constructor(context: Context?) : super(context) {
         initData()
     }
@@ -103,14 +103,19 @@ class CustomLocationImage : View {
             width / 2f - 20f,
             height.toFloat() * 3 / 4f - 30f
         )
-        canvas.translate(0f, width / 4f)
+        canvas.translate(0f, width / 8f)
         path.close()
         paint.color = Color.WHITE
         canvas.drawPath(path, paint)
         canvas.restore()
     }
 
+    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
 
+    }
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        setMeasuredDimension(width, height)
+    }
     override fun draw(canvas: Canvas) {
         super.draw(canvas)
         Log.d("Haibq", "draw: " + width)

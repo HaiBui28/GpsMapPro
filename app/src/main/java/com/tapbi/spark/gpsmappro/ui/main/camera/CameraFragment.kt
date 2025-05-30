@@ -166,7 +166,7 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
 
     override fun onCreatedView(view: View?, savedInstanceState: Bundle?) {
         initGoogleMap()
-        binding.customImahe.setWidthHeight(300, 300)
+//        binding.customImahe.setWidthHeight(300, 300)
         barcodeScanner = BarcodeScanning.getClient()
 
         cameraExecutor = Executors.newSingleThreadExecutor()
@@ -181,7 +181,7 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
         binding.btnMap.setOnClickListener {
             (activity as MainActivity).navigate(R.id.action_cameraFragment_to_googleMapFragment)
         }
-        Log.d("Haibq", "onCreatedView: "+ MediaUtil.getDevicePhotosByFolder(requireActivity()).size)
+//        Log.d("Haibq", "onCreatedView: "+ MediaUtil.getDevicePhotosByFolder(requireActivity()).size)
         App.instance?.let { viewModel.getListLocationPhoto(it) }
     }
 
@@ -303,6 +303,7 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
 
     override fun observerLiveData() {
         viewModel.listLocationPhoto.observe(viewLifecycleOwner) {
+            Log.d("Haibq", "observerLiveData: "+ it.size)
             if (App.instance?.foldersMap?.isEmpty() == true){
                 App.instance?.foldersMap?.addAll(it)
             }
@@ -347,7 +348,7 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
         }
 
         binding.btnCapture.setOnClickListener {
-            takePhoto()
+//            takePhoto()
         }
 
         binding.btnVideo.setOnClickListener {
@@ -905,6 +906,20 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
             }.mp4"
         )
         val output = FileOutputOptions.Builder(videoOutputFile).build()
+        if (ActivityCompat.checkSelfPermission(
+                requireActivity(),
+                Manifest.permission.RECORD_AUDIO
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            // TODO: Consider calling
+            //    ActivityCompat#requestPermissions
+            // here to request the missing permissions, and then overriding
+            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+            //                                          int[] grantResults)
+            // to handle the case where the user grants the permission. See the documentation
+            // for ActivityCompat#requestPermissions for more details.
+            return
+        }
         recording = videoCapture.output
             .prepareRecording(requireContext(), output)
             .withAudioEnabled()
@@ -937,7 +952,9 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
         ) {
 //            googleMap?.isMyLocationEnabled = true
             fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                Log.d("Haibq", "moveToCurrentLocation: 111111")
                 if (location != null) {
+                    Log.d("Haibq", "moveToCurrentLocation: ")
                     val latLng = LatLng(location.latitude, location.longitude)
                     googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 16f))
                     googleMap.addMarker(
@@ -1014,24 +1031,24 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
     }
 
     fun loadBitmapLocation() {
-        val mapFragment = childFragmentManager.findFragmentById(R.id.map) as SupportMapFragment
-        mapFragment.getMapAsync { googleMap ->
-            googleMap.snapshot { mapBitmap ->
-                if (mapBitmap != null) {
-                    // 👉 Gán mapBitmap vào ImageView, ẩn fragment
-                    binding.imMapSnapshot.setImageBitmap(mapBitmap)
-                    binding.imMapSnapshot.visibility = View.VISIBLE
-                    mapFragment.requireView().visibility = View.GONE
-
-                    // 👉 Chờ 1 frame để hệ thống render lại
-                    binding.llMap.postDelayed({
-                        binding.llMap.visibility=View.INVISIBLE
-                        overlayBitmap = binding.llMap.drawToBitmap()
-
-                    }, 80) // delay nhỏ để đảm bảo ảnh đã render
-                }
-            }
-        }
+//        val mapFragment = childFragmentManager.findFragmentById(R.id.map) as SupportMapFragment
+//        mapFragment.getMapAsync { googleMap ->
+//            googleMap.snapshot { mapBitmap ->
+//                if (mapBitmap != null) {
+//                    // 👉 Gán mapBitmap vào ImageView, ẩn fragment
+//                    binding.imMapSnapshot.setImageBitmap(mapBitmap)
+//                    binding.imMapSnapshot.visibility = View.VISIBLE
+//                    mapFragment.requireView().visibility = View.GONE
+//
+//                    // 👉 Chờ 1 frame để hệ thống render lại
+//                    binding.llMap.postDelayed({
+//                        binding.llMap.visibility=View.INVISIBLE
+//                        overlayBitmap = binding.llMap.drawToBitmap()
+//
+//                    }, 80) // delay nhỏ để đảm bảo ảnh đã render
+//                }
+//            }
+//        }
     }
 
 

@@ -34,6 +34,8 @@ import com.tapbi.spark.gpsmappro.App
 import com.tapbi.spark.gpsmappro.R
 import com.tapbi.spark.gpsmappro.databinding.FragmentGoogleMapBinding
 import com.tapbi.spark.gpsmappro.ui.base.BaseBindingFragment
+import com.tapbi.spark.gpsmappro.ui.custom.CustomLocationImage
+import com.tapbi.spark.gpsmappro.utils.Utils
 import java.io.IOException
 
 class GoogleMapFragment : BaseBindingFragment<FragmentGoogleMapBinding, GoogleMapViewModel>(),
@@ -101,6 +103,7 @@ class GoogleMapFragment : BaseBindingFragment<FragmentGoogleMapBinding, GoogleMa
         ) {
             googleMap.isMyLocationEnabled = true
             fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                Log.d("Haibq", "moveToCurrentLocation: " + location)
                 if (location != null) {
                     val latLng = LatLng(location.latitude, location.longitude)
                     this.latLng = latLng
@@ -131,6 +134,7 @@ class GoogleMapFragment : BaseBindingFragment<FragmentGoogleMapBinding, GoogleMa
             }
         }
     }
+
     private fun startListeningLocationUpdates() {
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireContext())
 
@@ -154,9 +158,14 @@ class GoogleMapFragment : BaseBindingFragment<FragmentGoogleMapBinding, GoogleMa
                 Manifest.permission.ACCESS_FINE_LOCATION
             ) == PackageManager.PERMISSION_GRANTED
         ) {
-            fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper())
+            fusedLocationClient.requestLocationUpdates(
+                locationRequest,
+                locationCallback,
+                Looper.getMainLooper()
+            )
         }
     }
+
     override fun onMapReady(map: GoogleMap) {
         this.googleMap = map
         map.mapType = GoogleMap.MAP_TYPE_NORMAL
@@ -165,21 +174,21 @@ class GoogleMapFragment : BaseBindingFragment<FragmentGoogleMapBinding, GoogleMa
         map.uiSettings.isCompassEnabled = true
         addMarker(map)
         moveToCurrentLocation(map)
-        var circle: Circle?=null
+        var circle: Circle? = null
         map.setOnCameraIdleListener {
             val center = map.cameraPosition.target
-            if (circle == null){
+            if (circle == null) {
                 val circleOptions = CircleOptions()
                 circleOptions.fillColor(Color.parseColor("#c8cfc5"))
                 circleOptions.center(center)
                 circleOptions.radius(100.0)
                 circleOptions.strokeWidth(1f)
                 circle = map.addCircle(circleOptions)
-            }else{
+            } else {
                 circle?.center = center
             }
-            val a = isPointInCircle(center,100.0,latLng)
-            Log.d("Haibq", "onMapReady: "+a)
+            val a = isPointInCircle(center, 100.0, latLng)
+            Log.d("Haibq", "onMapReady: " + a)
         }
         map.setOnMarkerClickListener { marker ->
 
@@ -191,6 +200,7 @@ class GoogleMapFragment : BaseBindingFragment<FragmentGoogleMapBinding, GoogleMa
             true
         }
     }
+
     fun isPointInCircle(center: LatLng, radiusInMeters: Double, point: LatLng): Boolean {
         val result = FloatArray(1)
         Location.distanceBetween(
@@ -200,16 +210,29 @@ class GoogleMapFragment : BaseBindingFragment<FragmentGoogleMapBinding, GoogleMa
         )
         return result[0] <= radiusInMeters
     }
+
     private fun addMarker(googleMap: GoogleMap) {
-            for (i in App.instance?.foldersMap!!){
-            val bitmap = MediaStore.Images.Media.getBitmap(context?.contentResolver, i.uriPreview?.toUri())
-            val resizedBitmap = Bitmap.createScaledBitmap(bitmap, 100, 100, false)
-            val descriptor = BitmapDescriptorFactory.fromBitmap(resizedBitmap)
-            googleMap.addMarker(
-                MarkerOptions()
-                    .position(i.latLng!!).icon(descriptor)
-                    .title("Vị trí mặc định")
-            )
+        val context = requireContext()
+        val screenSize = Utils.getWidthScreen() / 3
+        val sampleView = CustomLocationImage(context)
+        sampleView.setWidthHeight(screenSize, screenSize)
+        val defaultBitmap = Utils.getViewBitmap(sampleView, screenSize, screenSize)
+        val descriptor = defaultBitmap?.let { BitmapDescriptorFactory.fromBitmap(it) }
+        Log.d("Haibq", "addMarker: "+ Thread.currentThread().name)
+        App.instance?.foldersMap?.forEach { folder ->
+            folder.latLng?.let { latLng ->
+                googleMap.addMarker(
+                    MarkerOptions()
+                        .position(latLng)
+                        .icon(descriptor)
+                        .title("Vị trí mặc định")
+                )
+            }
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        Log.d("Haibq", "onDestroy: sdas")
     }
 }
