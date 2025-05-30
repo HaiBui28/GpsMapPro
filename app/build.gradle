@@ -78,6 +78,8 @@ dependencies {
     implementation 'com.google.firebase:firebase-analytics-ktx'
     implementation 'com.google.firebase:firebase-config-ktx'
     implementation 'androidx.activity:activity:1.9.3'
+    implementation 'androidx.camera.media3:media3-effect:1.0.0-alpha03'
+    implementation 'androidx.media3:media3-effect:1.7.1'
 //    implementation 'androidx.activity:activity:1.9.0'
 //    implementation 'com.makeramen:roundedimageview:2.3.0'
     //Test

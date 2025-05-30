@@ -95,7 +95,6 @@ import com.tapbi.spark.gpsmappro.ui.main.MainViewModel
 import com.tapbi.spark.gpsmappro.utils.MediaUtil
 import com.tapbi.spark.gpsmappro.utils.SimpleLocationManager
 import com.tapbi.spark.gpsmappro.utils.Utils.dpToPx
-import com.tapbi.spark.gpsmappro.utils.Utils.mergeBitmaps
 import com.tapbi.spark.gpsmappro.utils.afterMeasured
 import com.tapbi.spark.gpsmappro.utils.checkLocationPermission
 import com.tapbi.spark.gpsmappro.utils.clearAllConstraints
@@ -652,51 +651,51 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
             ContextCompat.getMainExecutor(requireContext()),
             object : ImageCapture.OnImageSavedCallback {
                 override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-                    val filePath = file.absolutePath
-                    val bitmapCamera = BitmapFactory.decodeFile(filePath)
-                        .correctOrientation(filePath)
-                        .let { if (isFrontCamera) it.mirrorHorizontally() else it }
-
-                    val mapFragment =
-                        childFragmentManager.findFragmentById(R.id.map) as SupportMapFragment
-                    mapFragment.getMapAsync { googleMap ->
-                        googleMap.snapshot { mapBitmap ->
-                            if (mapBitmap != null) {
-                                // 👉 Gán mapBitmap vào ImageView, ẩn fragment
-                                binding.imMapSnapshot.setImageBitmap(mapBitmap)
-                                binding.imMapSnapshot.visibility = View.VISIBLE
-                                mapFragment.requireView().visibility = View.GONE
-
-                                // 👉 Chờ 1 frame để hệ thống render lại
-                                binding.llMap.postDelayed({
-                                    val bitmapOverlay = binding.llMap.drawToBitmap()
-
-                                    // 👉 Gộp và lưu ảnh ở background
-                                    lifecycleScope.launch(Dispatchers.IO) {
-                                        val finalBitmap =
-                                            mergeBitmaps(bitmapCamera, bitmapOverlay, rotation)
-                                        finalBitmap.saveToGalleryWithLocation(
-                                            requireContext(),
-                                            simpleLocationManager?.getLocation(),
-                                            rotation
-                                        )
-
-                                        withContext(Dispatchers.Main) {
-                                            Toast.makeText(
-                                                context,
-                                                "Đã lưu ảnh với overlay",
-                                                Toast.LENGTH_SHORT
-                                            ).show()
-
-                                            // 👉 Khôi phục MapFragment sau khi chụp xong (optional)
-                                            binding.imMapSnapshot.visibility = View.GONE
-                                            mapFragment.requireView().visibility = View.VISIBLE
-                                        }
-                                    }
-                                }, 80) // delay nhỏ để đảm bảo ảnh đã render
-                            }
-                        }
-                    }
+//                    val filePath = file.absolutePath
+//                    val bitmapCamera = BitmapFactory.decodeFile(filePath)
+//                        .correctOrientation(filePath)
+//                        .let { if (isFrontCamera) it.mirrorHorizontally() else it }
+//
+//                    val mapFragment =
+//                        childFragmentManager.findFragmentById(R.id.map) as SupportMapFragment
+//                    mapFragment.getMapAsync { googleMap ->
+//                        googleMap.snapshot { mapBitmap ->
+//                            if (mapBitmap != null) {
+//                                // 👉 Gán mapBitmap vào ImageView, ẩn fragment
+//                                binding.imMapSnapshot.setImageBitmap(mapBitmap)
+//                                binding.imMapSnapshot.visibility = View.VISIBLE
+//                                mapFragment.requireView().visibility = View.GONE
+//
+//                                // 👉 Chờ 1 frame để hệ thống render lại
+//                                binding.llMap.postDelayed({
+//                                    val bitmapOverlay = binding.llMap.drawToBitmap()
+//
+//                                    // 👉 Gộp và lưu ảnh ở background
+//                                    lifecycleScope.launch(Dispatchers.IO) {
+//                                        val finalBitmap =
+//                                            mergeBitmaps(bitmapCamera, bitmapOverlay, rotation)
+//                                        finalBitmap.saveToGalleryWithLocation(
+//                                            requireContext(),
+//                                            simpleLocationManager?.getLocation(),
+//                                            rotation
+//                                        )
+//
+//                                        withContext(Dispatchers.Main) {
+//                                            Toast.makeText(
+//                                                context,
+//                                                "Đã lưu ảnh với overlay",
+//                                                Toast.LENGTH_SHORT
+//                                            ).show()
+//
+//                                            // 👉 Khôi phục MapFragment sau khi chụp xong (optional)
+//                                            binding.imMapSnapshot.visibility = View.GONE
+//                                            mapFragment.requireView().visibility = View.VISIBLE
+//                                        }
+//                                    }
+//                                }, 80) // delay nhỏ để đảm bảo ảnh đã render
+//                            }
+//                        }
+//                    }
                 }
 
                 override fun onError(exception: ImageCaptureException) {
@@ -727,108 +726,110 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
     }
 
 
-    private fun mergeBitmaps2(
-        cameraBitmap: Bitmap,
-        overlayBitmap: Bitmap,
-        rotation: Float
-    ): Bitmap {
-        val result = Bitmap.createBitmap(
-            cameraBitmap.width,
-            cameraBitmap.height,
-            cameraBitmap.config
-        )
-        val canvas = Canvas(result)
-        canvas.drawBitmap(cameraBitmap, 0f, 0f, null)
-        val m10dp = dpToPx(10)
+//    private fun mergeBitmaps2(
+//        cameraBitmap: Bitmap,
+//        overlayBitmap: Bitmap,
+//        rotation: Float
+//    ): Bitmap {
+//        val result = cameraBitmap.config?.let {
+//            Bitmap.createBitmap(
+//                cameraBitmap.width,
+//                cameraBitmap.height,
+//                it
+//            )
+//        }
+//        val canvas = Canvas(result)
+//        canvas.drawBitmap(cameraBitmap, 0f, 0f, null)
+//        val m10dp = dpToPx(10)
+//
+//        // ✅ Sử dụng Float để tránh chia lấy phần nguyên
+//        val availableWidth = cameraBitmap.width - 2 * m10dp
+//        val scale = availableWidth.toFloat() / overlayBitmap.width.toFloat()
+//
+//        val newOverlayWidth = (overlayBitmap.width * scale).toInt()
+//        val newOverlayHeight = (overlayBitmap.height * scale).toInt()
+//
+//        val scaledOverlay = Bitmap.createScaledBitmap(
+//            overlayBitmap,
+//            newOverlayWidth,
+//            newOverlayHeight,
+//            true
+//        )
+//        val topOffset = cameraBitmap.height - newOverlayHeight - m10dp
+//        canvas.drawBitmap(scaledOverlay, dpToPx(10).toFloat(), topOffset.toFloat(), null)
+//
+//        return result
+//    }
 
-        // ✅ Sử dụng Float để tránh chia lấy phần nguyên
-        val availableWidth = cameraBitmap.width - 2 * m10dp
-        val scale = availableWidth.toFloat() / overlayBitmap.width.toFloat()
-
-        val newOverlayWidth = (overlayBitmap.width * scale).toInt()
-        val newOverlayHeight = (overlayBitmap.height * scale).toInt()
-
-        val scaledOverlay = Bitmap.createScaledBitmap(
-            overlayBitmap,
-            newOverlayWidth,
-            newOverlayHeight,
-            true
-        )
-        val topOffset = cameraBitmap.height - newOverlayHeight - m10dp
-        canvas.drawBitmap(scaledOverlay, dpToPx(10).toFloat(), topOffset.toFloat(), null)
-
-        return result
-    }
-
-    private fun mergeBitmaps(cameraBitmap: Bitmap, overlayBitmap: Bitmap, rotation: Float): Bitmap {
-        val result = Bitmap.createBitmap(
-            cameraBitmap.width,
-            cameraBitmap.height,
-            cameraBitmap.config
-        )
-        val canvas = Canvas(result)
-        canvas.drawBitmap(cameraBitmap, 0f, 0f, null)
-        val margin = dpToPx(10).toFloat()
-
-        // Scale overlay cho vừa chiều rộng
-        val availableWidth = cameraBitmap.width - 2 * margin
-        val scale = availableWidth / overlayBitmap.width.toFloat()
-
-        val newOverlayWidth = (overlayBitmap.width * scale).toInt()
-        val newOverlayHeight = (overlayBitmap.height * scale).toInt()
-
-        val scaledOverlay = Bitmap.createScaledBitmap(
-            overlayBitmap,
-            newOverlayWidth,
-            newOverlayHeight,
-            true
-        )
-
-        // Tạo matrix xoay quanh tâm ảnh overlay
-        val matrix = Matrix()
-        matrix.postScale(1f, 1f) // scale giữ nguyên
-        matrix.postRotate(rotation, newOverlayWidth / 2f, newOverlayHeight / 2f)
-
-        val rotatedOverlay = Bitmap.createBitmap(
-            scaledOverlay,
-            0,
-            0,
-            newOverlayWidth,
-            newOverlayHeight,
-            matrix,
-            true
-        )
-
-        // Vẽ rotatedOverlay vào vị trí thích hợp
-        val left: Float
-        val top: Float
-        when (rotation) {
-            Rotation_2 -> {
-                left = margin
-                top = cameraBitmap.height.toFloat() / 2 - rotatedOverlay.height.toFloat() / 2
-            }
-
-            Rotation_3 -> {
-                left = cameraBitmap.width.toFloat() - rotatedOverlay.width.toFloat() - margin
-                top = cameraBitmap.height.toFloat() / 2 - rotatedOverlay.height.toFloat() / 2
-            }
-
-            Rotation_4 -> {
-                left = margin
-                top = margin
-            }
-
-            else -> {
-                left = margin
-                top = cameraBitmap.height - rotatedOverlay.height - margin
-            }
-        }
-
-
-        canvas.drawBitmap(rotatedOverlay, left, top, null)
-
-        return result
-    }
+//    private fun mergeBitmaps(cameraBitmap: Bitmap, overlayBitmap: Bitmap, rotation: Float): Bitmap {
+//        val result = Bitmap.createBitmap(
+//            cameraBitmap.width,
+//            cameraBitmap.height,
+//            cameraBitmap.config
+//        )
+//        val canvas = Canvas(result)
+//        canvas.drawBitmap(cameraBitmap, 0f, 0f, null)
+//        val margin = dpToPx(10).toFloat()
+//
+//        // Scale overlay cho vừa chiều rộng
+//        val availableWidth = cameraBitmap.width - 2 * margin
+//        val scale = availableWidth / overlayBitmap.width.toFloat()
+//
+//        val newOverlayWidth = (overlayBitmap.width * scale).toInt()
+//        val newOverlayHeight = (overlayBitmap.height * scale).toInt()
+//
+//        val scaledOverlay = Bitmap.createScaledBitmap(
+//            overlayBitmap,
+//            newOverlayWidth,
+//            newOverlayHeight,
+//            true
+//        )
+//
+//        // Tạo matrix xoay quanh tâm ảnh overlay
+//        val matrix = Matrix()
+//        matrix.postScale(1f, 1f) // scale giữ nguyên
+//        matrix.postRotate(rotation, newOverlayWidth / 2f, newOverlayHeight / 2f)
+//
+//        val rotatedOverlay = Bitmap.createBitmap(
+//            scaledOverlay,
+//            0,
+//            0,
+//            newOverlayWidth,
+//            newOverlayHeight,
+//            matrix,
+//            true
+//        )
+//
+//        // Vẽ rotatedOverlay vào vị trí thích hợp
+//        val left: Float
+//        val top: Float
+//        when (rotation) {
+//            Rotation_2 -> {
+//                left = margin
+//                top = cameraBitmap.height.toFloat() / 2 - rotatedOverlay.height.toFloat() / 2
+//            }
+//
+//            Rotation_3 -> {
+//                left = cameraBitmap.width.toFloat() - rotatedOverlay.width.toFloat() - margin
+//                top = cameraBitmap.height.toFloat() / 2 - rotatedOverlay.height.toFloat() / 2
+//            }
+//
+//            Rotation_4 -> {
+//                left = margin
+//                top = margin
+//            }
+//
+//            else -> {
+//                left = margin
+//                top = cameraBitmap.height - rotatedOverlay.height - margin
+//            }
+//        }
+//
+//
+//        canvas.drawBitmap(rotatedOverlay, left, top, null)
+//
+//        return result
+//    }
 
     fun Bitmap.correctOrientation(filePath: String): Bitmap {
         val exif = ExifInterface(filePath)
@@ -1018,17 +1019,17 @@ class CameraFragment : BaseBindingFragment<FragmentCameraBinding, MainViewModel>
         mapFragment.getMapAsync { googleMap ->
             googleMap.snapshot { mapBitmap ->
                 if (mapBitmap != null) {
-                    // 👉 Gán mapBitmap vào ImageView, ẩn fragment
-                    binding.imMapSnapshot.setImageBitmap(mapBitmap)
-                    binding.imMapSnapshot.visibility = View.VISIBLE
-                    mapFragment.requireView().visibility = View.GONE
-
-                    // 👉 Chờ 1 frame để hệ thống render lại
-                    binding.llMap.postDelayed({
-                        binding.llMap.visibility=View.INVISIBLE
-                        overlayBitmap = binding.llMap.drawToBitmap()
-
-                    }, 80) // delay nhỏ để đảm bảo ảnh đã render
+//                    // 👉 Gán mapBitmap vào ImageView, ẩn fragment
+//                    binding.imMapSnapshot.setImageBitmap(mapBitmap)
+//                    binding.imMapSnapshot.visibility = View.VISIBLE
+//                    mapFragment.requireView().visibility = View.GONE
+//
+//                    // 👉 Chờ 1 frame để hệ thống render lại
+//                    binding.llMap.postDelayed({
+//                        binding.llMap.visibility=View.INVISIBLE
+//                        overlayBitmap = binding.llMap.drawToBitmap()
+//
+//                    }, 80) // delay nhỏ để đảm bảo ảnh đã render
                 }
             }
         }
