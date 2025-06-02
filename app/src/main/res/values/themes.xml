@@ -1,4 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme. -->
     <style name="Base.Theme.GpsMapPro" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- Customize your light theme here. -->
@@ -13,5 +13,7 @@
         <item name="android:background">@android:color/transparent</item>
     </style>
 
-    <style name="Theme.GpsMapPro" parent="Base.Theme.GpsMapPro" />
+    <style name="Theme.GpsMapPro" parent="Base.Theme.GpsMapPro">
+        <item name="android:forceDarkAllowed" tools:targetApi="q">false</item>
+    </style>
 </resources>
