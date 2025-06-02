@@ -2,6 +2,7 @@ package com.tapbi.spark.gpsmappro.ui.main.camera5
 
 import android.Manifest
 import android.annotation.SuppressLint
+import androidx.annotation.WorkerThread
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Geocoder

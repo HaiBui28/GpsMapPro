@@ -2,7 +2,7 @@
 buildscript {
     ext {
 
-        agp_version = '8.4.1'
+        agp_version = '8.6.0'
     }
     ext.kotlin_version = '1.6.21'
     apply from: "dependencies.gradle"
