@@ -57,11 +57,31 @@ class CustomLocationImage : View {
 
     private fun drawBackgroundCircle(canvas: Canvas) {
         canvas.save()
+
         paint.color = Color.WHITE
         canvas.drawCircle(width / 2f, height / 2f, width / 4f, paint)
+
         drawBitmap(canvas, (width / 4f).roundToInt(), (width / 4f).roundToInt())
+
+        val circleX = width * 2.95f / 4f
+        val circleY = height / 3f
+        val circleRadius = width / 12f
+
         paint.color = Color.BLACK
-        canvas.drawCircle(width * 2.95f / 4f, height / 3f, width / 12f, paint)
+        canvas.drawCircle(circleX, circleY, circleRadius, paint)
+
+        paint.color = Color.WHITE
+        paint.textSize = circleRadius
+        paint.textAlign = Paint.Align.CENTER
+        paint.isFakeBoldText = true
+
+        // Căn giữa theo chiều dọc
+        val fontMetrics = paint.fontMetrics
+        val text = "1000"
+        val textY = circleY - (fontMetrics.ascent + fontMetrics.descent) / 2
+
+        canvas.drawText(text, circleX, textY, paint)
+
         canvas.restore()
     }
 

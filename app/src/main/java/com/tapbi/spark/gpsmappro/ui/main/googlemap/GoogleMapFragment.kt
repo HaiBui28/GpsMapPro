@@ -179,7 +179,8 @@ class GoogleMapFragment : BaseBindingFragment<FragmentGoogleMapBinding, GoogleMa
             val center = map.cameraPosition.target
             if (circle == null) {
                 val circleOptions = CircleOptions()
-                circleOptions.fillColor(Color.parseColor("#c8cfc5"))
+                circleOptions.strokeColor(Color.parseColor("#12F510"))
+                circleOptions.fillColor(Color.parseColor("#3312F510"))
                 circleOptions.center(center)
                 circleOptions.radius(100.0)
                 circleOptions.strokeWidth(1f)

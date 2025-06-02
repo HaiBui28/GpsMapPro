@@ -2,7 +2,6 @@ package com.tapbi.spark.gpsmappro.ui.main.camera5
 
 import android.Manifest
 import android.annotation.SuppressLint
-import android.annotation.WorkerThread
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Geocoder
@@ -18,6 +17,7 @@ import android.os.SystemClock
 import android.util.Log
 import android.view.View
 import android.widget.Toast
+import androidx.annotation.WorkerThread
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.app.ActivityCompat
 import androidx.core.view.setMargins

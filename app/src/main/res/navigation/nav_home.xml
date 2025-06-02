@@ -2,7 +2,7 @@
 <navigation xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/nav_host_home"
-    app:startDestination="@id/camera5Fragment">
+    app:startDestination="@id/camera6Fragment">
 
     <fragment
         android:id="@+id/homeFragment"
@@ -38,4 +38,8 @@
         android:id="@+id/camera5Fragment"
         android:name="com.tapbi.spark.gpsmappro.ui.main.camera5.Camera5Fragment"
         android:label="Camera5Fragment" />
+    <fragment
+        android:id="@+id/camera6Fragment"
+        android:name="com.tapbi.spark.gpsmappro.ui.camera6.Camera6Fragment"
+        android:label="Camera6Fragment" />
 </navigation>
