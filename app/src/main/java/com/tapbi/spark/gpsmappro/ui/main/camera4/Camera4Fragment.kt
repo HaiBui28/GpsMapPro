@@ -3,8 +3,10 @@ package com.tapbi.spark.gpsmappro.ui.main.camera4
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.media.MediaScannerConnection
@@ -15,11 +17,13 @@ import android.os.Looper
 import android.util.Log
 import android.util.Size
 import android.view.View
+import android.widget.SeekBar
 import android.widget.Toast
 import androidx.annotation.OptIn
 import androidx.camera.core.AspectRatio
+import androidx.camera.core.CameraControl
 import androidx.camera.core.CameraEffect
-import androidx.camera.core.CameraEffect.PREVIEW
+import androidx.camera.core.CameraInfo
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
@@ -38,51 +42,61 @@ import androidx.camera.video.VideoCapture
 import androidx.camera.video.VideoRecordEvent
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.constraintlayout.widget.ConstraintSet
+import androidx.core.content.ContentProviderCompat.requireContext
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.scale
+import androidx.core.view.drawToBitmap
+import androidx.core.view.setMargins
+import androidx.exifinterface.media.ExifInterface
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.whenCreated
 import androidx.media3.common.Effect
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.BitmapOverlay
+import androidx.media3.effect.Brightness
 import androidx.media3.effect.StaticOverlaySettings
 import androidx.media3.effect.TextureOverlay
+import androidx.work.await
+import com.google.android.gms.location.LocationServices
 import com.google.common.collect.ImmutableList
+import com.tapbi.spark.gpsmappro.App
 import com.tapbi.spark.gpsmappro.R
 import com.tapbi.spark.gpsmappro.databinding.FragmentCamera4Binding
 import com.tapbi.spark.gpsmappro.feature.BalanceBarView
-import com.tapbi.spark.gpsmappro.ui.base.BaseBindingFragment
-import com.tapbi.spark.gpsmappro.ui.main.MainViewModel
-import org.checkerframework.checker.units.qual.h
-import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import androidx.core.graphics.createBitmap
-import androidx.core.view.drawToBitmap
-import androidx.core.graphics.scale
-import androidx.core.view.setMargins
-import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.whenCreated
-import androidx.work.await
-import com.tapbi.spark.gpsmappro.App
 import com.tapbi.spark.gpsmappro.feature.BalanceBarView.Companion.Rotation_2
 import com.tapbi.spark.gpsmappro.feature.BalanceBarView.Companion.Rotation_3
 import com.tapbi.spark.gpsmappro.feature.BalanceBarView.Companion.Rotation_4
+import com.tapbi.spark.gpsmappro.ui.base.BaseBindingFragment
+import com.tapbi.spark.gpsmappro.ui.main.MainViewModel
 import com.tapbi.spark.gpsmappro.utils.Utils
 import com.tapbi.spark.gpsmappro.utils.Utils.dpToPx
 import com.tapbi.spark.gpsmappro.utils.clearAllConstraints
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import java.io.File
+import java.io.FileOutputStream
+import java.io.IOException
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewModel>() {
     private var cameraIndex = 0
     private var qualityIndex = 0
     private var audioEnabled = false
     private val cameraCapabilities = mutableListOf<CameraCapability>()
-    private var enumerationDeferred:Deferred<Unit>? = null
+    private var enumerationDeferred: Deferred<Unit>? = null
     override fun getViewModel(): Class<MainViewModel> {
         return MainViewModel::class.java
     }
+
+    private val fusedLocationClient by lazy {
+        LocationServices.getFusedLocationProviderClient(requireContext())
+    }
+
     init {
         enumerationDeferred = lifecycleScope.async {
             whenCreated {
@@ -220,9 +234,43 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
                 ContextCompat.getMainExecutor(requireContext()),
                 object : ImageCapture.OnImageSavedCallback {
                     override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
+                        val filePath = photoFile.absolutePath
+                        val bitmapCamera = BitmapFactory.decodeFile(filePath)
+                        val bitmapOverlay =
+                            createHelloTextBitmap(bitmapCamera.width, bitmapCamera.height)
+                        val bitmapMerged = mergeBitmap(bitmapCamera, bitmapOverlay)
+                        val bitmapResult = bitmapMerged.correctOrientation(-rotation)
+                        try {
+                            val fos = FileOutputStream(photoFile)
+                            bitmapResult.compress(Bitmap.CompressFormat.JPEG, 100, fos)
 
-                        Toast.makeText(requireContext(), "Lưu ảnh thành công!", Toast.LENGTH_SHORT)
-                            .show()
+                            fos.flush()
+                            fos.close()
+                            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                                if (location != null) {
+                                    try {
+                                        val exif = ExifInterface(filePath)
+                                        exif.setGpsInfo(location)
+                                        exif.saveAttributes()
+                                    } catch (e: IOException) {
+                                        e.printStackTrace()
+                                    }
+                                }
+                            }
+
+                            Toast.makeText(
+                                requireContext(),
+                                "Lưu ảnh thành công!",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        } catch (e: IOException) {
+                            e.printStackTrace()
+                            Toast.makeText(
+                                requireContext(),
+                                "Lỗi lưu ảnh sau merge!",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
                     }
 
                     override fun onError(exception: ImageCaptureException) {
@@ -239,6 +287,16 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
         binding.fabVideo.setOnClickListener {
             if (recording != null) stopRecording() else startRecording()
         }
+    }
+
+
+    fun Bitmap.correctOrientation(rotation: Float): Bitmap {
+        if (rotation == 0f) return this
+
+        val matrix = Matrix()
+        matrix.postRotate(rotation)
+
+        return Bitmap.createBitmap(this, 0, 0, width, height, matrix, true)
     }
 
 
@@ -334,7 +392,7 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
 
             media3Effect = Media3Effect(
                 requireContext(),
-                 CameraEffect.VIDEO_CAPTURE,
+                CameraEffect.VIDEO_CAPTURE,
                 cameraExecutor
             ) {}
             val effect = ImmutableList.Builder<Effect>()
@@ -360,14 +418,25 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
         return when (quality) {
             Quality.UHD -> Size(3840, 2160)
             Quality.FHD -> Size(1920, 1080)
-            Quality.HD  -> Size(1280, 720)
-            Quality.SD  -> Size(720, 480)
+            Quality.HD -> Size(1280, 720)
+            Quality.SD -> Size(720, 480)
             else -> Size(1280, 720) // fallback
         }
     }
+
+    fun mergeBitmap(bmp1: Bitmap, bmp2: Bitmap): Bitmap {
+        val bmOverlay =createBitmap(bmp1.getWidth(), bmp1.getHeight(), bmp1.getConfig()!!)
+        val canvas = Canvas(bmOverlay)
+        canvas.drawBitmap(bmp1, Matrix(), null)
+        canvas.drawBitmap(bmp2, 0f, 0f, null)
+        bmp1.recycle()
+        bmp2.recycle()
+        return bmOverlay
+    }
+
     @UnstableApi
-    private fun createOverlayEffect(videoSize : Size): androidx.media3.effect.OverlayEffect? {
-        Log.e("NVQ","createOverlayEffect++++")
+    private fun createOverlayEffect(videoSize: Size): androidx.media3.effect.OverlayEffect? {
+        Log.e("NVQ", "createOverlayEffect++++")
         val overlayBuilder = ImmutableList.Builder<TextureOverlay>()
         val settings = StaticOverlaySettings.Builder()
             .setAlphaScale(1f)

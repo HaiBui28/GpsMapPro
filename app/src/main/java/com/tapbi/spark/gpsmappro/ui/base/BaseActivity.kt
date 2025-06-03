@@ -2,6 +2,8 @@ package com.tapbi.spark.gpsmappro.ui.base
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.res.Configuration
+import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import com.tapbi.spark.gpsmappro.R

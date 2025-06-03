@@ -1,6 +1,8 @@
 package com.tapbi.spark.gpsmappro.ui.base
 
+import android.content.res.Configuration
 import android.os.Bundle
+import android.util.Log
 import androidx.databinding.DataBindingUtil
 import androidx.databinding.ViewDataBinding
 import androidx.lifecycle.ViewModelProvider
