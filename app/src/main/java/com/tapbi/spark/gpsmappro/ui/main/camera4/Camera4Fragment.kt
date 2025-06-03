@@ -1,14 +1,19 @@
 package com.tapbi.spark.gpsmappro.ui.main.camera4
 
 import android.Manifest
+import android.annotation.SuppressLint
+import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Typeface
+import android.hardware.camera2.CaptureRequest
 import android.media.MediaScannerConnection
+import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
 import android.os.Handler
@@ -20,6 +25,7 @@ import android.view.View
 import android.widget.SeekBar
 import android.widget.Toast
 import androidx.annotation.OptIn
+import androidx.camera.camera2.interop.Camera2Interop
 import androidx.camera.core.AspectRatio
 import androidx.camera.core.CameraControl
 import androidx.camera.core.CameraEffect
@@ -46,6 +52,7 @@ import androidx.core.graphics.createBitmap
 import androidx.core.graphics.scale
 import androidx.core.view.drawToBitmap
 import androidx.core.view.setMargins
+import androidx.exifinterface.media.ExifInterface
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.whenCreated
@@ -70,8 +77,10 @@ import com.tapbi.spark.gpsmappro.utils.Utils
 import com.tapbi.spark.gpsmappro.utils.Utils.dpToPx
 import com.tapbi.spark.gpsmappro.utils.clearAllConstraints
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -233,58 +242,61 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
                 outputOptions,
                 ContextCompat.getMainExecutor(requireContext()),
                 object : ImageCapture.OnImageSavedCallback {
+                    @SuppressLint("RestrictedApi")
                     override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-                        Toast.makeText(
-                            requireContext(),
-                            "Lưu ảnh thành công!",
-                            Toast.LENGTH_SHORT
-                        ).show()
-//                        val filePath = photoFile.absolutePath
-//                        val bitmapCamera = BitmapFactory.decodeFile(filePath)
-//                        val bitmapOverlay =
-//                            createHelloTextBitmap(bitmapCamera.width, bitmapCamera.height)
-//                        val bitmapMerged = mergeBitmap(bitmapCamera, bitmapOverlay)
-//                        val bitmapResult = bitmapMerged.correctOrientation(-rotation)
-//                        try {
-//                            val fos = FileOutputStream(photoFile)
-//                            bitmapResult.compress(Bitmap.CompressFormat.JPEG, 100, fos)
-//
-//                            fos.flush()
-//                            fos.close()
-//                            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
-//                                if (location != null) {
-//                                    try {
-//                                        val exif = ExifInterface(filePath)
-//                                        exif.setGpsInfo(location)
-//                                        exif.saveAttributes()
-//                                    } catch (e: IOException) {
-//                                        e.printStackTrace()
-//                                    }
-//                                }
-//                            }
-//
-//                            Toast.makeText(
-//                                requireContext(),
-//                                "Lưu ảnh thành công!",
-//                                Toast.LENGTH_SHORT
-//                            ).show()
-//                        } catch (e: IOException) {
-//                            e.printStackTrace()
-//                            Toast.makeText(
-//                                requireContext(),
-//                                "Lỗi lưu ảnh sau merge!",
-//                                Toast.LENGTH_SHORT
-//                            ).show()
-//                        }
+                        val savedUri = outputFileResults.savedUri ?: return
+
+                        lifecycleScope.launch(Dispatchers.IO) {
+                            try {
+                                val inputStream =
+                                    requireContext().contentResolver.openInputStream(savedUri)
+                                var originalBitmap = BitmapFactory.decodeStream(inputStream)
+                                inputStream?.close()
+
+                                if (originalBitmap == null) return@launch
+                                originalBitmap = rotateBitmapIfRequired(
+                                    originalBitmap,
+                                    savedUri,
+                                    requireContext()
+                                )
+                                // Tạo bitmap từ view llMap scale đúng với ảnh gốc
+
+
+                                // Merge 2 bitmap
+                                val mergedBitmap = mergeBitmapAtBottomWithMargin(originalBitmap, getBitmapFromView(binding.llMap), marginBottom = 20)
+
+                                // Ghi đè lại ảnh gốc
+                                requireContext().contentResolver.openOutputStream(savedUri)
+                                    ?.use { outStream ->
+                                        mergedBitmap.compress(
+                                            Bitmap.CompressFormat.JPEG,
+                                            100,
+                                            outStream
+                                        )
+                                    }
+
+                                withContext(Dispatchers.Main) {
+                                    Toast.makeText(
+                                        requireContext(),
+                                        "Ảnh đã được lưu với overlay",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                                withContext(Dispatchers.Main) {
+                                    Toast.makeText(
+                                        requireContext(),
+                                        "Lỗi: ${e.message}",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            }
+                        }
                     }
 
                     override fun onError(exception: ImageCaptureException) {
-                        Toast.makeText(
-                            requireContext(),
-                            "Lỗi lưu ảnh: ${exception.message}",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                        Log.e("Camera", "Image capture failed", exception)
+
                     }
                 }
             )
@@ -294,21 +306,112 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
         }
     }
 
+    fun rotateBitmapIfRequired(bitmap: Bitmap, imageUri: Uri, context: Context): Bitmap {
+        val inputStream = context.contentResolver.openInputStream(imageUri) ?: return bitmap
+        val exif = ExifInterface(inputStream)
 
-    fun Bitmap.correctOrientation(rotation: Float): Bitmap {
-        if (rotation == 0f) return this
+        val orientation =
+            exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+        inputStream.close()
 
         val matrix = Matrix()
-        matrix.postRotate(rotation)
+        Log.d("chungvv", "rotateBitmapIfRequired: $orientation")
+        when (orientation) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
+            ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
+            ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
+            else -> return bitmap // Không cần xoay
+        }
 
-        return Bitmap.createBitmap(this, 0, 0, width, height, matrix, true)
+        return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+    }
+
+
+    fun getBitmapFromView(view: View): Bitmap {
+        val width = view.width
+        val height = view.height
+
+        if (width == 0 || height == 0) {
+            // View chưa đo/layout xong, bạn có thể ép đo lại nếu cần
+            view.measure(
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+            )
+            view.layout(0, 0, view.measuredWidth, view.measuredHeight)
+        }
+
+        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        view.draw(canvas)
+        return bitmap
+    }
+    fun mergeBitmapAtBottomWithMargin(
+        originalBitmap: Bitmap,
+        overlayBitmap: Bitmap,
+        marginBottom: Int,
+        maxOverlayHeightRatio: Float = 0.33f // overlay max cao = 1/3 ảnh gốc
+    ): Bitmap {
+        val result = Bitmap.createBitmap(
+            originalBitmap.width,
+            originalBitmap.height,
+            originalBitmap.config ?: Bitmap.Config.ARGB_8888
+        )
+        val canvas = Canvas(result)
+        // Vẽ ảnh gốc
+        canvas.drawBitmap(originalBitmap, 0f, 0f, null)
+
+        val targetWidth = originalBitmap.width.toFloat()
+        val maxHeight = originalBitmap.height * maxOverlayHeightRatio
+
+        // Scale theo width
+        var scale = targetWidth / overlayBitmap.width.toFloat()
+        var scaledHeight = overlayBitmap.height * scale
+
+        // Nếu chiều cao sau scale > maxHeight thì scale theo chiều cao
+        if (scaledHeight > maxHeight) {
+            scale = maxHeight / overlayBitmap.height.toFloat()
+            scaledHeight = maxHeight
+        }
+
+        val scaledOverlay = Bitmap.createScaledBitmap(overlayBitmap, (overlayBitmap.width * scale).toInt(), scaledHeight.toInt(), true)
+
+        val left = (originalBitmap.width - scaledOverlay.width) / 2f
+        val top = originalBitmap.height - scaledHeight - marginBottom
+
+        canvas.drawBitmap(scaledOverlay, left, top, null)
+
+        return result
+    }
+
+
+
+    fun getDegreesFromRotation(rotation: Int): Int {
+        return when (rotation) {
+            Surface.ROTATION_0 -> 0
+            Surface.ROTATION_90 -> 270 // Thiết bị xoay trái => ảnh phải xoay phải
+            Surface.ROTATION_180 -> 180
+            Surface.ROTATION_270 -> 90 // Thiết bị xoay phải => ảnh phải xoay trái
+            else -> 0
+        }
+    }
+
+    fun mergeBitmaps(background: Bitmap, overlay: Bitmap): Bitmap {
+        val result = Bitmap.createBitmap(
+            background.width,
+            background.height,
+            background.config ?: Bitmap.Config.ARGB_8888
+        )
+        val canvas = Canvas(result)
+        canvas.drawBitmap(background, 0f, 0f, null)
+        canvas.drawBitmap(overlay, 0f, 0f, null)
+        return result
     }
 
     fun getRotationCamera(): Int {
-        return  when (rotation.toInt()) {
+        return when (rotation.toInt()) {
             90 -> Surface.ROTATION_90
             180 -> Surface.ROTATION_180
-            270 -> Surface.ROTATION_270
+            270, (-90) -> Surface.ROTATION_270
             else -> Surface.ROTATION_0
         }
     }
@@ -375,59 +478,92 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
     }
 
 
-    @OptIn(UnstableApi::class)
+    @OptIn(UnstableApi::class, androidx.camera.camera2.interop.ExperimentalCamera2Interop::class)
+
     private suspend fun startCamera() {
         enumerationDeferred?.await()
-        val aspectRatioStrategry = AspectRatioStrategy(
+
+        val aspectRatioStrategy = AspectRatioStrategy(
             AspectRatio.RATIO_16_9,
             AspectRatioStrategy.FALLBACK_RULE_NONE
         )
-        val resolutionSelector =
-            ResolutionSelector.Builder().setAspectRatioStrategy(aspectRatioStrategry).build()
+
+        val resolutionSelector = ResolutionSelector.Builder()
+            .setAspectRatioStrategy(aspectRatioStrategy)
+            .build()
+
         val cameraProviderFuture = ProcessCameraProvider.getInstance(requireContext())
+
         cameraProviderFuture.addListener({
-            val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
-            val preview = Preview.Builder().setResolutionSelector(resolutionSelector).build().also {
-                it.surfaceProvider = binding.previewView.surfaceProvider
+            val cameraProvider = cameraProviderFuture.get()
+
+            // --- Cân bằng trắng: bạn có thể thay đổi sang AUTO, INCANDESCENT, etc.
+            val awbMode = CaptureRequest.CONTROL_AWB_MODE_AUTO
+
+            // --- Preview Builder + WB ---
+            val previewBuilder = Preview.Builder()
+                .setResolutionSelector(resolutionSelector)
+
+            Camera2Interop.Extender(previewBuilder)
+                .setCaptureRequestOption(CaptureRequest.CONTROL_AWB_MODE, awbMode)
+
+            val preview = previewBuilder.build().also {
+                it.setSurfaceProvider(binding.previewView.surfaceProvider)
             }
 
-            imageCapture = ImageCapture.Builder()
+            // --- ImageCapture Builder + WB ---
+            val imageCaptureBuilder = ImageCapture.Builder()
                 .setResolutionSelector(resolutionSelector)
                 .setTargetRotation(binding.previewView.display.rotation)
                 .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
-                .build()
-            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+
+            Camera2Interop.Extender(imageCaptureBuilder)
+                .setCaptureRequestOption(CaptureRequest.CONTROL_AWB_MODE, awbMode)
+
+            imageCapture = imageCaptureBuilder.build()
+
+            // --- VideoCapture ---
             val recorder = Recorder.Builder()
                 .setQualitySelector(QualitySelector.from(Quality.UHD))
                 .build()
+
             videoCapture = VideoCapture.withOutput(recorder)
-            val useCaseGroup = UseCaseGroup.Builder().addUseCase(preview).addUseCase(imageCapture!!)
+
+            // --- UseCaseGroup ---
+            val useCaseGroup = UseCaseGroup.Builder()
+                .addUseCase(preview)
+                .addUseCase(imageCapture!!)
                 .addUseCase(videoCapture)
+
+            // --- Media3 Effects ---
+            val videoSize = getSizeForQuality(Quality.UHD)
+            val effectBuilder = ImmutableList.Builder<Effect>()
+            val overlay = createOverlayEffect(videoSize)
 
             media3Effect = Media3Effect(
                 requireContext(),
                 CameraEffect.VIDEO_CAPTURE,
                 cameraExecutor
             ) {}
-            val effect = ImmutableList.Builder<Effect>()
-            val videoSize = getSizeForQuality(Quality.UHD)
 
-            val overlay = createOverlayEffect(videoSize)
-            overlay?.let { effect.add(it) }
-            media3Effect?.setEffects(effect.build())
+            overlay?.let { effectBuilder.add(it) }
+            media3Effect?.setEffects(effectBuilder.build())
             useCaseGroup.addEffect(media3Effect!!)
+
             try {
                 cameraProvider.unbindAll()
+
                 val camera = cameraProvider.bindToLifecycle(
                     viewLifecycleOwner,
-                    cameraSelector,
+                    CameraSelector.DEFAULT_BACK_CAMERA,
                     useCaseGroup.build()
                 )
+
                 cameraControl = camera.cameraControl
                 val cameraInfo = camera.cameraInfo
 
-
-                val exposureState = camera.cameraInfo.exposureState
+                // --- Exposure control ---
+                val exposureState = cameraInfo.exposureState
                 val minExposure = exposureState.exposureCompensationRange.lower
                 val maxExposure = exposureState.exposureCompensationRange.upper
                 val currentExposure = exposureState.exposureCompensationIndex
@@ -443,21 +579,19 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
                         fromUser: Boolean
                     ) {
                         val exposureValue = progress + minExposure
-                        camera.cameraControl.setExposureCompensationIndex(exposureValue)
+                        cameraControl.setExposureCompensationIndex(exposureValue)
                     }
 
                     override fun onStartTrackingTouch(seekBar: SeekBar?) {}
                     override fun onStopTrackingTouch(seekBar: SeekBar?) {}
                 })
 
-
-                cameraInfo.zoomState.observe(this) { zoomState ->
+                // --- Zoom control ---
+                cameraInfo.zoomState.observe(viewLifecycleOwner) { zoomState ->
                     val minZoom = zoomState.minZoomRatio
                     val maxZoom = zoomState.maxZoomRatio
                     val currentZoom = zoomState.zoomRatio
 
-
-                    // Update seekbar progress (avoid infinite loop by checking match)
                     val progress = ((currentZoom - minZoom) / (maxZoom - minZoom) * 100).toInt()
                     if (binding.zoomSeekBar.progress != progress) {
                         binding.zoomSeekBar.progress = progress
@@ -481,15 +615,13 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
                     })
                 }
 
-
-//                val overlay = ColorDrawable(Color.parseColor("#90608080"))
-//                binding.previewView.foreground = overlay
-
             } catch (e: Exception) {
                 e.printStackTrace()
             }
+
         }, cameraExecutor)
     }
+
 
     fun getSizeForQuality(quality: Quality): Size {
         return when (quality) {
