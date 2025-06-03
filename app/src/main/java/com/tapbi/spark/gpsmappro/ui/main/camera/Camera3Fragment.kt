@@ -580,7 +580,7 @@ class Camera3Fragment : BaseBindingFragment<FragmentCamera3Binding, MainViewMode
         moveToCurrentLocation(map)
         map.setOnCameraIdleListener {}
         loadBitmapLocation()
-    }
+    } //
 
     fun moveToCurrentLocation(googleMap: GoogleMap) {
         val fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity())
