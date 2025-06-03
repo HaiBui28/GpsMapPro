@@ -3,7 +3,6 @@ package com.tapbi.spark.gpsmappro.ui.main.camera4
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Matrix
@@ -16,6 +15,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.util.Size
+import android.view.Surface
 import android.view.View
 import android.widget.SeekBar
 import android.widget.Toast
@@ -23,7 +23,6 @@ import androidx.annotation.OptIn
 import androidx.camera.core.AspectRatio
 import androidx.camera.core.CameraControl
 import androidx.camera.core.CameraEffect
-import androidx.camera.core.CameraInfo
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
@@ -42,20 +41,17 @@ import androidx.camera.video.VideoCapture
 import androidx.camera.video.VideoRecordEvent
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.constraintlayout.widget.ConstraintSet
-import androidx.core.content.ContentProviderCompat.requireContext
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.scale
 import androidx.core.view.drawToBitmap
 import androidx.core.view.setMargins
-import androidx.exifinterface.media.ExifInterface
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.whenCreated
 import androidx.media3.common.Effect
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.BitmapOverlay
-import androidx.media3.effect.Brightness
 import androidx.media3.effect.StaticOverlaySettings
 import androidx.media3.effect.TextureOverlay
 import androidx.work.await
@@ -77,8 +73,6 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import java.io.File
-import java.io.FileOutputStream
-import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -89,6 +83,8 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
     private var audioEnabled = false
     private val cameraCapabilities = mutableListOf<CameraCapability>()
     private var enumerationDeferred: Deferred<Unit>? = null
+
+    private lateinit var cameraControl: CameraControl
     override fun getViewModel(): Class<MainViewModel> {
         return MainViewModel::class.java
     }
@@ -228,49 +224,58 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
 
             // Create output options object which contains file + metadata
             val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
-
+            Log.d(
+                "chungvv",
+                "hachung binding.previewView.display.rotation: ${binding.previewView.display.rotation}, /rotation: $rotation"
+            )
+            imageCapture?.setTargetRotation(getRotationCamera())
             imageCapture?.takePicture(
                 outputOptions,
                 ContextCompat.getMainExecutor(requireContext()),
                 object : ImageCapture.OnImageSavedCallback {
                     override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-                        val filePath = photoFile.absolutePath
-                        val bitmapCamera = BitmapFactory.decodeFile(filePath)
-                        val bitmapOverlay =
-                            createHelloTextBitmap(bitmapCamera.width, bitmapCamera.height)
-                        val bitmapMerged = mergeBitmap(bitmapCamera, bitmapOverlay)
-                        val bitmapResult = bitmapMerged.correctOrientation(-rotation)
-                        try {
-                            val fos = FileOutputStream(photoFile)
-                            bitmapResult.compress(Bitmap.CompressFormat.JPEG, 100, fos)
-
-                            fos.flush()
-                            fos.close()
-                            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
-                                if (location != null) {
-                                    try {
-                                        val exif = ExifInterface(filePath)
-                                        exif.setGpsInfo(location)
-                                        exif.saveAttributes()
-                                    } catch (e: IOException) {
-                                        e.printStackTrace()
-                                    }
-                                }
-                            }
-
-                            Toast.makeText(
-                                requireContext(),
-                                "Lưu ảnh thành công!",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        } catch (e: IOException) {
-                            e.printStackTrace()
-                            Toast.makeText(
-                                requireContext(),
-                                "Lỗi lưu ảnh sau merge!",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
+                        Toast.makeText(
+                            requireContext(),
+                            "Lưu ảnh thành công!",
+                            Toast.LENGTH_SHORT
+                        ).show()
+//                        val filePath = photoFile.absolutePath
+//                        val bitmapCamera = BitmapFactory.decodeFile(filePath)
+//                        val bitmapOverlay =
+//                            createHelloTextBitmap(bitmapCamera.width, bitmapCamera.height)
+//                        val bitmapMerged = mergeBitmap(bitmapCamera, bitmapOverlay)
+//                        val bitmapResult = bitmapMerged.correctOrientation(-rotation)
+//                        try {
+//                            val fos = FileOutputStream(photoFile)
+//                            bitmapResult.compress(Bitmap.CompressFormat.JPEG, 100, fos)
+//
+//                            fos.flush()
+//                            fos.close()
+//                            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+//                                if (location != null) {
+//                                    try {
+//                                        val exif = ExifInterface(filePath)
+//                                        exif.setGpsInfo(location)
+//                                        exif.saveAttributes()
+//                                    } catch (e: IOException) {
+//                                        e.printStackTrace()
+//                                    }
+//                                }
+//                            }
+//
+//                            Toast.makeText(
+//                                requireContext(),
+//                                "Lưu ảnh thành công!",
+//                                Toast.LENGTH_SHORT
+//                            ).show()
+//                        } catch (e: IOException) {
+//                            e.printStackTrace()
+//                            Toast.makeText(
+//                                requireContext(),
+//                                "Lỗi lưu ảnh sau merge!",
+//                                Toast.LENGTH_SHORT
+//                            ).show()
+//                        }
                     }
 
                     override fun onError(exception: ImageCaptureException) {
@@ -299,6 +304,14 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
         return Bitmap.createBitmap(this, 0, 0, width, height, matrix, true)
     }
 
+    fun getRotationCamera(): Int {
+        return  when (rotation.toInt()) {
+            90 -> Surface.ROTATION_90
+            180 -> Surface.ROTATION_180
+            270 -> Surface.ROTATION_270
+            else -> Surface.ROTATION_0
+        }
+    }
 
     private fun startRecording() {
 
@@ -340,11 +353,11 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
             @OptIn(UnstableApi::class)
             override fun onRotationChanged(rotation: Float) {
                 if (lifecycle.currentState == Lifecycle.State.RESUMED) {
-                        if (rotation != this@Camera4Fragment.rotation) {
-                            this@Camera4Fragment.rotation = rotation
-                            handler.removeCallbacks(runnable)
-                            handler.postDelayed(runnable, 300)
-                        }
+                    if (rotation != this@Camera4Fragment.rotation) {
+                        this@Camera4Fragment.rotation = rotation
+                        handler.removeCallbacks(runnable)
+                        handler.postDelayed(runnable, 300)
+                    }
 
                 }
             }
@@ -352,15 +365,14 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
     }
 
     @OptIn(UnstableApi::class)
-    fun updateOverlay(){
-        Utils.safeDelay(500){
+    fun updateOverlay() {
+        Utils.safeDelay(500) {
             val effect = ImmutableList.Builder<Effect>()
             val overlay = createOverlayEffect(getSizeForQuality(Quality.UHD))
             overlay?.let { effect.add(it) }
             media3Effect?.setEffects(effect.build())
         }
     }
-
 
 
     @OptIn(UnstableApi::class)
@@ -378,13 +390,15 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
             val preview = Preview.Builder().setResolutionSelector(resolutionSelector).build().also {
                 it.surfaceProvider = binding.previewView.surfaceProvider
             }
+
             imageCapture = ImageCapture.Builder()
                 .setResolutionSelector(resolutionSelector)
+                .setTargetRotation(binding.previewView.display.rotation)
                 .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
                 .build()
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
             val recorder = Recorder.Builder()
-                .setQualitySelector(QualitySelector.from(Quality.HIGHEST))
+                .setQualitySelector(QualitySelector.from(Quality.UHD))
                 .build()
             videoCapture = VideoCapture.withOutput(recorder)
             val useCaseGroup = UseCaseGroup.Builder().addUseCase(preview).addUseCase(imageCapture!!)
@@ -404,16 +418,79 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
             useCaseGroup.addEffect(media3Effect!!)
             try {
                 cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(
+                val camera = cameraProvider.bindToLifecycle(
                     viewLifecycleOwner,
                     cameraSelector,
                     useCaseGroup.build()
                 )
+                cameraControl = camera.cameraControl
+                val cameraInfo = camera.cameraInfo
+
+
+                val exposureState = camera.cameraInfo.exposureState
+                val minExposure = exposureState.exposureCompensationRange.lower
+                val maxExposure = exposureState.exposureCompensationRange.upper
+                val currentExposure = exposureState.exposureCompensationIndex
+
+                binding.SeekBarAs.max = maxExposure - minExposure
+                binding.SeekBarAs.progress = currentExposure - minExposure
+
+                binding.SeekBarAs.setOnSeekBarChangeListener(object :
+                    SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(
+                        seekBar: SeekBar?,
+                        progress: Int,
+                        fromUser: Boolean
+                    ) {
+                        val exposureValue = progress + minExposure
+                        camera.cameraControl.setExposureCompensationIndex(exposureValue)
+                    }
+
+                    override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+                    override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+                })
+
+
+                cameraInfo.zoomState.observe(this) { zoomState ->
+                    val minZoom = zoomState.minZoomRatio
+                    val maxZoom = zoomState.maxZoomRatio
+                    val currentZoom = zoomState.zoomRatio
+
+
+                    // Update seekbar progress (avoid infinite loop by checking match)
+                    val progress = ((currentZoom - minZoom) / (maxZoom - minZoom) * 100).toInt()
+                    if (binding.zoomSeekBar.progress != progress) {
+                        binding.zoomSeekBar.progress = progress
+                    }
+
+                    binding.zoomSeekBar.setOnSeekBarChangeListener(object :
+                        SeekBar.OnSeekBarChangeListener {
+                        override fun onProgressChanged(
+                            seekBar: SeekBar?,
+                            progress: Int,
+                            fromUser: Boolean
+                        ) {
+                            if (fromUser) {
+                                val targetZoom = minZoom + (progress / 100f) * (maxZoom - minZoom)
+                                cameraControl.setZoomRatio(targetZoom)
+                            }
+                        }
+
+                        override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+                        override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+                    })
+                }
+
+
+//                val overlay = ColorDrawable(Color.parseColor("#90608080"))
+//                binding.previewView.foreground = overlay
+
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }, cameraExecutor)
     }
+
     fun getSizeForQuality(quality: Quality): Size {
         return when (quality) {
             Quality.UHD -> Size(3840, 2160)
@@ -425,7 +502,7 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
     }
 
     fun mergeBitmap(bmp1: Bitmap, bmp2: Bitmap): Bitmap {
-        val bmOverlay =createBitmap(bmp1.getWidth(), bmp1.getHeight(), bmp1.getConfig()!!)
+        val bmOverlay = createBitmap(bmp1.getWidth(), bmp1.getHeight(), bmp1.getConfig()!!)
         val canvas = Canvas(bmOverlay)
         canvas.drawBitmap(bmp1, Matrix(), null)
         canvas.drawBitmap(bmp2, 0f, 0f, null)
@@ -508,5 +585,6 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
     override fun onBackPressed() {
 
     }
-    data class CameraCapability(val camSelector: CameraSelector, val qualities:List<Quality>)
+
+    data class CameraCapability(val camSelector: CameraSelector, val qualities: List<Quality>)
 }
