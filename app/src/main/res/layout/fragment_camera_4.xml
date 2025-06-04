@@ -15,7 +15,6 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:translationZ="3dp"
-            app:layout_constraintDimensionRatio="9:16"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
@@ -28,6 +27,15 @@
             app:layout_constraintTop_toTopOf="@id/previewView"
             app:layout_constraintBottom_toBottomOf="@id/previewView"
             android:translationZ="4dp">
+
+            <com.tapbi.spark.gpsmappro.feature.GridViewCamera
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                app:layout_constraintStart_toStartOf="@id/layoutOverlay"
+                app:layout_constraintEnd_toEndOf="@id/layoutOverlay"
+                app:layout_constraintTop_toTopOf="@id/layoutOverlay"
+                app:layout_constraintBottom_toBottomOf="@id/layoutOverlay"/>
+
             <androidx.constraintlayout.widget.ConstraintLayout
                 android:id="@+id/llMap"
                 android:layout_width="match_parent"
