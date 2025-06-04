@@ -99,6 +99,7 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
     private val cameraCapabilities = mutableListOf<CameraCapability>()
     private var enumerationDeferred: Deferred<Unit>? = null
     private var isAspectRatio16_9 = true
+    private var typeGrid = 0
 
 
     private var sizeVideo: Size = Size(1920, 1080)
