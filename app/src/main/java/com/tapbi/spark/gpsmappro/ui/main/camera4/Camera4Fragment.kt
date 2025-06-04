@@ -30,7 +30,9 @@ import androidx.camera.camera2.interop.Camera2Interop
 import androidx.camera.core.AspectRatio
 import androidx.camera.core.CameraControl
 import androidx.camera.core.CameraEffect
+import androidx.camera.core.CameraInfo
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
@@ -98,9 +100,12 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
     private var enumerationDeferred: Deferred<Unit>? = null
     private var isAspectRatio16_9 = true
 
+
+    private var sizeVideo: Size = Size(1920, 1080)
+
+
     val saveOriginal = true
     val shareAfterSaved = false
-
 
 
     private lateinit var cameraControl: CameraControl
@@ -268,13 +273,18 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
                                 val originalFile = File(savedUri.path ?: return@launch)
 
                                 // Xoay ảnh đúng chiều
-                                originalBitmap = rotateBitmapIfRequired(originalBitmap, savedUri, context)
+                                originalBitmap =
+                                    rotateBitmapIfRequired(originalBitmap, savedUri, context)
 
                                 // Lấy overlay bitmap
                                 val overlayBitmap = getBitmapFromView(binding.llMap)
 
                                 // Merge overlay
-                                val mergedBitmap = mergeBitmapAtBottomWithMargin(originalBitmap, overlayBitmap, marginBottom = 20)
+                                val mergedBitmap = mergeBitmapAtBottomWithMargin(
+                                    originalBitmap,
+                                    overlayBitmap,
+                                    marginBottom = 20
+                                )
 
                                 if (saveOriginal) {
                                     // === Lưu overlay ra file mới ===
@@ -290,10 +300,12 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
                                     resetExifOrientationToNormal(overlayFile.absolutePath)
 
                                     // Cập nhật MediaStore
-                                    MediaScannerConnection.scanFile(context, arrayOf(
-                                        overlayFile.absolutePath,
-                                        originalFile.absolutePath
-                                    ), arrayOf("image/jpeg", "image/jpeg"), null)
+                                    MediaScannerConnection.scanFile(
+                                        context, arrayOf(
+                                            overlayFile.absolutePath,
+                                            originalFile.absolutePath
+                                        ), arrayOf("image/jpeg", "image/jpeg"), null
+                                    )
 
                                     // Chia sẻ nếu cần
                                     if (shareAfterSaved) {
@@ -309,7 +321,12 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
                                     resetExifOrientationToNormal(originalFile.absolutePath)
 
                                     // Cập nhật MediaStore
-                                    MediaScannerConnection.scanFile(context, arrayOf(originalFile.absolutePath), arrayOf("image/jpeg"), null)
+                                    MediaScannerConnection.scanFile(
+                                        context,
+                                        arrayOf(originalFile.absolutePath),
+                                        arrayOf("image/jpeg"),
+                                        null
+                                    )
 
                                     if (shareAfterSaved) {
                                         withContext(Dispatchers.Main) {
@@ -329,7 +346,11 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
                             } catch (e: Exception) {
                                 e.printStackTrace()
                                 withContext(Dispatchers.Main) {
-                                    Toast.makeText(requireContext(), "Lỗi: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(
+                                        requireContext(),
+                                        "Lỗi: ${e.message}",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
                                 }
                             }
                         }
@@ -402,10 +423,14 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
             e.printStackTrace()
         }
     }
+
     fun resetExifOrientationToNormal(imagePath: String) {
         try {
             val exif = ExifInterface(imagePath)
-            exif.setAttribute(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL.toString())
+            exif.setAttribute(
+                ExifInterface.TAG_ORIENTATION,
+                ExifInterface.ORIENTATION_NORMAL.toString()
+            )
             exif.saveAttributes()
         } catch (e: Exception) {
             e.printStackTrace()
@@ -587,14 +612,18 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
     fun updateOverlay() {
         Utils.safeDelay(500) {
             val effect = ImmutableList.Builder<Effect>()
-            val overlay = createOverlayEffect(getSizeForQuality(Quality.UHD))
+            val overlay = createOverlayEffect(sizeVideo)
             overlay?.let { effect.add(it) }
             media3Effect?.setEffects(effect.build())
         }
     }
 
 
-    @OptIn(UnstableApi::class, androidx.camera.camera2.interop.ExperimentalCamera2Interop::class)
+    @OptIn(
+        UnstableApi::class,
+        androidx.camera.camera2.interop.ExperimentalCamera2Interop::class,
+        ExperimentalGetImage::class
+    )
     private suspend fun startCamera() {
         enumerationDeferred?.await()
         changeLayoutParams()
@@ -645,13 +674,14 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
 
             imageCapture = imageCaptureBuilder.build()
 
+
             val recorder = Recorder.Builder()
                 .setQualitySelector(
-                    QualitySelector.fromOrderedList(
-                        listOf(Quality.UHD, Quality.FHD, Quality.HD, Quality.SD),
-                        FallbackStrategy.lowerQualityThan(Quality.FHD)
+                    QualitySelector.from(
+                        Quality.HIGHEST
                     )
                 )
+                .setAspectRatio(targetAspectRatio)
                 .build()
 
             videoCapture = VideoCapture.withOutput(recorder)
@@ -662,10 +692,11 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
                 .addUseCase(imageCapture!!)
                 .addUseCase(videoCapture)
 
+
             // --- Media3 Effects ---
             val videoSize = getSizeForQuality(Quality.UHD)
             val effectBuilder = ImmutableList.Builder<Effect>()
-            val overlay = createOverlayEffect(videoSize)
+
 
             media3Effect = Media3Effect(
                 requireContext(),
@@ -673,8 +704,7 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
                 cameraExecutor
             ) {}
 
-            overlay?.let { effectBuilder.add(it) }
-            media3Effect?.setEffects(effectBuilder.build())
+
             useCaseGroup.addEffect(media3Effect!!)
 
             try {
@@ -688,6 +718,24 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
 
                 cameraControl = camera.cameraControl
                 val cameraInfo = camera.cameraInfo
+
+                 sizeVideo = if (isAspectRatio16_9) {
+                    QualitySelector.getResolution(cameraInfo, Quality.HIGHEST)!!
+                } else {
+                    predictVideoSizeWithLimit(camera.cameraInfo,
+                        Quality.FHD,
+                        aspectRatioWidth = 4,
+                        aspectRatioHeight = 3)
+                }
+
+                for (quality in QualitySelector.getSupportedQualities(cameraInfo)) {
+                    val size = QualitySelector.getResolution(cameraInfo, quality) ?: continue
+                    val ratio = size.width.toFloat() / size.height
+                    Log.d("VideoSizeCheck", "Quality: $quality, Size: $size, Ratio: $ratio")
+                }
+                val overlay = sizeVideo?.let { createOverlayEffect(it) }
+                overlay?.let { effectBuilder.add(it) }
+                media3Effect?.setEffects(effectBuilder.build())
 
                 // --- Exposure control ---
                 val exposureState = cameraInfo.exposureState
@@ -742,13 +790,44 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
                     })
                 }
             } catch (e: Exception) {
-                Log.d("namnn266", "startCamera: "+e.message)
+                Log.d("namnn266", "startCamera: " + e.message)
                 Log.d("namnn266", "startCamera: 1111")
                 e.printStackTrace()
             }
 
         }, cameraExecutor)
     }
+
+    fun predictVideoSizeWithLimit(
+        cameraInfo: CameraInfo,
+        quality: Quality,
+        aspectRatioWidth: Int,
+        aspectRatioHeight: Int
+    ): Size {
+        val resolution = QualitySelector.getResolution(cameraInfo, quality) ?: return Size(1280, 960)
+
+        val widthStandard = resolution.width
+        val heightStandard = resolution.height
+
+        val ratioStandard = widthStandard.toFloat() / heightStandard
+        val ratioTarget = aspectRatioWidth.toFloat() / aspectRatioHeight
+
+        val predictedSize = if (ratioStandard > ratioTarget) {
+            Size((heightStandard * aspectRatioWidth) / aspectRatioHeight, heightStandard)
+        } else {
+            Size(widthStandard, (widthStandard * aspectRatioHeight) / aspectRatioWidth)
+        }
+
+        // Giới hạn kích thước tối đa để tránh quá lớn
+        val maxWidth = 1920 // ví dụ giới hạn Full HD
+        val maxHeight = 1440 // ví dụ giới hạn chiều cao 4:3 tương ứng
+
+        val finalWidth = minOf(predictedSize.width, maxWidth)
+        val finalHeight = minOf(predictedSize.height, maxHeight)
+
+        return Size(finalWidth, finalHeight)
+    }
+
 
     private fun changeLayoutParams() {
         binding.previewView.apply {
@@ -827,6 +906,7 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
 
     fun createHelloTextBitmap(width: Int, height: Int): Bitmap {
         // Vẽ View llMap ra bitmap gốc
+        Log.d("chungvv", "width: $width  /height: $height")
         val mapBitmap = binding.layoutOverlay.drawToBitmap()
 
         // Tạo bitmap mới có đúng size mong muốn
