@@ -264,7 +264,11 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
 
 
                                 // Merge 2 bitmap
-                                val mergedBitmap = mergeBitmapAtBottomWithMargin(originalBitmap, getBitmapFromView(binding.llMap), marginBottom = 20)
+                                val mergedBitmap = mergeBitmapAtBottomWithMargin(
+                                    originalBitmap,
+                                    getBitmapFromView(binding.llMap),
+                                    marginBottom = 20
+                                )
 
                                 // Ghi đè lại ảnh gốc
                                 requireContext().contentResolver.openOutputStream(savedUri)
@@ -286,7 +290,7 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
 
                                 MediaScannerConnection.scanFile(
                                     requireContext(),
-                                    arrayOf( outputFileResults.savedUri?.path),
+                                    arrayOf(outputFileResults.savedUri?.path),
                                     arrayOf("*/jpg"),
                                     null
                                 )
@@ -321,36 +325,30 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
 
     private fun toggleAspectRatio() {
         isAspectRatio16_9 = !isAspectRatio16_9
-        updatePreviewViewAspectRatio()
-        // Restart camera với aspect ratio mới
         lifecycleScope.launch {
             restartCameraWithNewAspectRatio()
         }
 
-        // Hiển thị thông báo cho user biết đã chuyển đổi
         val aspectRatioText = if (isAspectRatio16_9) "16:9" else "4:3"
-        Toast.makeText(requireContext(), "Chuyển sang tỷ lệ $aspectRatioText", Toast.LENGTH_SHORT).show()
-    }
-
-    private fun updatePreviewViewAspectRatio() {
-        val layoutParams = binding.previewView.layoutParams as ConstraintLayout.LayoutParams
-        val newRatio = if (isAspectRatio16_9) "16:9" else "4:3"
-        layoutParams.dimensionRatio = newRatio
-        binding.previewView.layoutParams = layoutParams
+        Toast.makeText(requireContext(), "Chuyển sang tỷ lệ $aspectRatioText", Toast.LENGTH_SHORT)
+            .show()
     }
 
     private suspend fun restartCameraWithNewAspectRatio() {
         try {
-            // Unbind tất cả use cases hiện tại
-            val cameraProvider = ProcessCameraProvider.getInstance(requireContext()).await()
-            cameraProvider.unbindAll()
-
-            // Start camera với aspect ratio mới
+            withContext(Dispatchers.Main) {
+                val cameraProvider = ProcessCameraProvider.getInstance(requireContext()).await()
+                cameraProvider.unbindAll()
+            }
             startCamera()
         } catch (e: Exception) {
             e.printStackTrace()
             withContext(Dispatchers.Main) {
-                Toast.makeText(requireContext(), "Lỗi khi chuyển đổi: ${e.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    requireContext(),
+                    "Lỗi khi chuyển đổi: ${e.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
             }
         }
     }
@@ -395,13 +393,14 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
         view.draw(canvas)
         return bitmap
     }
+
     fun mergeBitmapAtBottomWithMargin(
         originalBitmap: Bitmap,
         overlayBitmap: Bitmap,
         marginBottom: Int,
-        maxOverlayHeightRatio: Float = 0.33f // overlay max cao = 1/3 ảnh gốc
+        maxOverlayHeightRatio: Float = 0.33f
     ): Bitmap {
-        val result = Bitmap.createBitmap(
+        val result = createBitmap(
             originalBitmap.width,
             originalBitmap.height,
             originalBitmap.config ?: Bitmap.Config.ARGB_8888
@@ -423,37 +422,14 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
             scaledHeight = maxHeight
         }
 
-        val scaledOverlay = Bitmap.createScaledBitmap(overlayBitmap, (overlayBitmap.width * scale).toInt(), scaledHeight.toInt(), true)
+        val scaledOverlay =
+            overlayBitmap.scale((overlayBitmap.width * scale).toInt(), scaledHeight.toInt())
 
         val left = (originalBitmap.width - scaledOverlay.width) / 2f
         val top = originalBitmap.height - scaledHeight - marginBottom
 
         canvas.drawBitmap(scaledOverlay, left, top, null)
 
-        return result
-    }
-
-
-
-    fun getDegreesFromRotation(rotation: Int): Int {
-        return when (rotation) {
-            Surface.ROTATION_0 -> 0
-            Surface.ROTATION_90 -> 270 // Thiết bị xoay trái => ảnh phải xoay phải
-            Surface.ROTATION_180 -> 180
-            Surface.ROTATION_270 -> 90 // Thiết bị xoay phải => ảnh phải xoay trái
-            else -> 0
-        }
-    }
-
-    fun mergeBitmaps(background: Bitmap, overlay: Bitmap): Bitmap {
-        val result = Bitmap.createBitmap(
-            background.width,
-            background.height,
-            background.config ?: Bitmap.Config.ARGB_8888
-        )
-        val canvas = Canvas(result)
-        canvas.drawBitmap(background, 0f, 0f, null)
-        canvas.drawBitmap(overlay, 0f, 0f, null)
         return result
     }
 
@@ -529,20 +505,16 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
 
 
     @OptIn(UnstableApi::class, androidx.camera.camera2.interop.ExperimentalCamera2Interop::class)
-
     private suspend fun startCamera() {
         enumerationDeferred?.await()
-
-        Log.d("namnn266", "startCamera1: "+isAspectRatio16_9)
-
         val targetAspectRatio = if (isAspectRatio16_9) {
             AspectRatio.RATIO_16_9
         } else {
             AspectRatio.RATIO_4_3
         }
 
+        changeLayoutParams()
 
-        Log.d("namnn266", "startCamera2: "+targetAspectRatio)
         val aspectRatioStrategy = AspectRatioStrategy(
             targetAspectRatio,
             AspectRatioStrategy.FALLBACK_RULE_AUTO
@@ -583,7 +555,8 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
             imageCapture = imageCaptureBuilder.build()
 
             // --- VideoCapture với aspect ratio tương ứng ---
-            val videoQuality = if (isAspectRatio16_9) Quality.UHD else Quality.FHD // 4:3 thường dùng FHD
+            val videoQuality =
+                if (isAspectRatio16_9) Quality.UHD else Quality.FHD // 4:3 thường dùng FHD
             val recorder = Recorder.Builder()
                 .setQualitySelector(QualitySelector.from(videoQuality))
                 .build()
@@ -675,7 +648,6 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
                         override fun onStopTrackingTouch(seekBar: SeekBar?) {}
                     })
                 }
-
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -683,16 +655,19 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
         }, cameraExecutor)
     }
 
-
-//    fun getSizeForQuality(quality: Quality): Size {
-//        return when (quality) {
-//            Quality.UHD -> Size(3840, 2160)
-//            Quality.FHD -> Size(1920, 1080)
-//            Quality.HD -> Size(1280, 720)
-//            Quality.SD -> Size(720, 480)
-//            else -> Size(1280, 720) // fallback
-//        }
-//    }
+    private fun changeLayoutParams() {
+        binding.previewView.apply {
+            val params: ConstraintLayout.LayoutParams =
+                layoutParams as ConstraintLayout.LayoutParams
+            val parameter = if (isAspectRatio16_9) {
+                "9:16"
+            } else {
+                "3:4"
+            }
+            params.dimensionRatio = parameter
+            layoutParams = params
+        }
+    }
 
     fun getSizeForQuality(quality: Quality): Size {
         return if (isAspectRatio16_9) {
@@ -714,19 +689,8 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
         }
     }
 
-    fun mergeBitmap(bmp1: Bitmap, bmp2: Bitmap): Bitmap {
-        val bmOverlay = createBitmap(bmp1.getWidth(), bmp1.getHeight(), bmp1.getConfig()!!)
-        val canvas = Canvas(bmOverlay)
-        canvas.drawBitmap(bmp1, Matrix(), null)
-        canvas.drawBitmap(bmp2, 0f, 0f, null)
-        bmp1.recycle()
-        bmp2.recycle()
-        return bmOverlay
-    }
-
     @UnstableApi
     private fun createOverlayEffect(videoSize: Size): androidx.media3.effect.OverlayEffect? {
-        Log.e("NVQ", "createOverlayEffect++++")
         val overlayBuilder = ImmutableList.Builder<TextureOverlay>()
         val settings = StaticOverlaySettings.Builder()
             .setAlphaScale(1f)

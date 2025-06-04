@@ -15,13 +15,18 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:translationZ="3dp"
+            app:layout_constraintDimensionRatio="9:16"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
         <androidx.constraintlayout.widget.ConstraintLayout
             android:id="@+id/layoutOverlay"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            app:layout_constraintStart_toStartOf="@id/previewView"
+            app:layout_constraintEnd_toEndOf="@id/previewView"
+            app:layout_constraintTop_toTopOf="@id/previewView"
+            app:layout_constraintBottom_toBottomOf="@id/previewView"
             android:translationZ="4dp">
             <androidx.constraintlayout.widget.ConstraintLayout
                 android:id="@+id/llMap"
@@ -96,7 +101,7 @@
             android:id="@+id/previewView"
             android:layout_width="0dp"
             android:layout_height="0dp"
-            app:scaleType="fillCenter"
+            app:scaleType="fitCenter"
             app:implementationMode="performance"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
