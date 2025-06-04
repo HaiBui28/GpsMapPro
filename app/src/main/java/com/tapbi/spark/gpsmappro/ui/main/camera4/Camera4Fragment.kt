@@ -92,6 +92,7 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
     private var audioEnabled = false
     private val cameraCapabilities = mutableListOf<CameraCapability>()
     private var enumerationDeferred: Deferred<Unit>? = null
+    private var isAspectRatio16_9 = true
 
     private lateinit var cameraControl: CameraControl
     override fun getViewModel(): Class<MainViewModel> {
@@ -282,6 +283,13 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
                                         Toast.LENGTH_SHORT
                                     ).show()
                                 }
+
+                                MediaScannerConnection.scanFile(
+                                    requireContext(),
+                                    arrayOf( outputFileResults.savedUri?.path),
+                                    arrayOf("*/jpg"),
+                                    null
+                                )
                             } catch (e: Exception) {
                                 e.printStackTrace()
                                 withContext(Dispatchers.Main) {
@@ -304,7 +312,49 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
         binding.fabVideo.setOnClickListener {
             if (recording != null) stopRecording() else startRecording()
         }
+
+        binding.fabFront.setOnClickListener {
+            toggleAspectRatio()
+        }
     }
+
+
+    private fun toggleAspectRatio() {
+        isAspectRatio16_9 = !isAspectRatio16_9
+        updatePreviewViewAspectRatio()
+        // Restart camera với aspect ratio mới
+        lifecycleScope.launch {
+            restartCameraWithNewAspectRatio()
+        }
+
+        // Hiển thị thông báo cho user biết đã chuyển đổi
+        val aspectRatioText = if (isAspectRatio16_9) "16:9" else "4:3"
+        Toast.makeText(requireContext(), "Chuyển sang tỷ lệ $aspectRatioText", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun updatePreviewViewAspectRatio() {
+        val layoutParams = binding.previewView.layoutParams as ConstraintLayout.LayoutParams
+        val newRatio = if (isAspectRatio16_9) "16:9" else "4:3"
+        layoutParams.dimensionRatio = newRatio
+        binding.previewView.layoutParams = layoutParams
+    }
+
+    private suspend fun restartCameraWithNewAspectRatio() {
+        try {
+            // Unbind tất cả use cases hiện tại
+            val cameraProvider = ProcessCameraProvider.getInstance(requireContext()).await()
+            cameraProvider.unbindAll()
+
+            // Start camera với aspect ratio mới
+            startCamera()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            withContext(Dispatchers.Main) {
+                Toast.makeText(requireContext(), "Lỗi khi chuyển đổi: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
 
     fun rotateBitmapIfRequired(bitmap: Bitmap, imageUri: Uri, context: Context): Bitmap {
         val inputStream = context.contentResolver.openInputStream(imageUri) ?: return bitmap
@@ -483,9 +533,19 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
     private suspend fun startCamera() {
         enumerationDeferred?.await()
 
+        Log.d("namnn266", "startCamera1: "+isAspectRatio16_9)
+
+        val targetAspectRatio = if (isAspectRatio16_9) {
+            AspectRatio.RATIO_16_9
+        } else {
+            AspectRatio.RATIO_4_3
+        }
+
+
+        Log.d("namnn266", "startCamera2: "+targetAspectRatio)
         val aspectRatioStrategy = AspectRatioStrategy(
-            AspectRatio.RATIO_16_9,
-            AspectRatioStrategy.FALLBACK_RULE_NONE
+            targetAspectRatio,
+            AspectRatioStrategy.FALLBACK_RULE_AUTO
         )
 
         val resolutionSelector = ResolutionSelector.Builder()
@@ -522,9 +582,10 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
 
             imageCapture = imageCaptureBuilder.build()
 
-            // --- VideoCapture ---
+            // --- VideoCapture với aspect ratio tương ứng ---
+            val videoQuality = if (isAspectRatio16_9) Quality.UHD else Quality.FHD // 4:3 thường dùng FHD
             val recorder = Recorder.Builder()
-                .setQualitySelector(QualitySelector.from(Quality.UHD))
+                .setQualitySelector(QualitySelector.from(videoQuality))
                 .build()
 
             videoCapture = VideoCapture.withOutput(recorder)
@@ -536,7 +597,7 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
                 .addUseCase(videoCapture)
 
             // --- Media3 Effects ---
-            val videoSize = getSizeForQuality(Quality.UHD)
+            val videoSize = getSizeForQuality(videoQuality)
             val effectBuilder = ImmutableList.Builder<Effect>()
             val overlay = createOverlayEffect(videoSize)
 
@@ -623,13 +684,33 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
     }
 
 
+//    fun getSizeForQuality(quality: Quality): Size {
+//        return when (quality) {
+//            Quality.UHD -> Size(3840, 2160)
+//            Quality.FHD -> Size(1920, 1080)
+//            Quality.HD -> Size(1280, 720)
+//            Quality.SD -> Size(720, 480)
+//            else -> Size(1280, 720) // fallback
+//        }
+//    }
+
     fun getSizeForQuality(quality: Quality): Size {
-        return when (quality) {
-            Quality.UHD -> Size(3840, 2160)
-            Quality.FHD -> Size(1920, 1080)
-            Quality.HD -> Size(1280, 720)
-            Quality.SD -> Size(720, 480)
-            else -> Size(1280, 720) // fallback
+        return if (isAspectRatio16_9) {
+            when (quality) {
+                Quality.UHD -> Size(3840, 2160)
+                Quality.FHD -> Size(1920, 1080)
+                Quality.HD -> Size(1280, 720)
+                Quality.SD -> Size(720, 480)
+                else -> Size(1280, 720)
+            }
+        } else {
+            when (quality) {
+                Quality.UHD -> Size(2880, 2160)
+                Quality.FHD -> Size(1440, 1080)
+                Quality.HD -> Size(960, 720)
+                Quality.SD -> Size(640, 480)
+                else -> Size(960, 720)
+            }
         }
     }
 
