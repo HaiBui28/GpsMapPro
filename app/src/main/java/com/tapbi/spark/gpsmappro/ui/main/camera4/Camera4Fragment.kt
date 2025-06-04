@@ -3,6 +3,7 @@ package com.tapbi.spark.gpsmappro.ui.main.camera4
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -49,6 +50,7 @@ import androidx.camera.video.VideoRecordEvent
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.constraintlayout.widget.ConstraintSet
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.scale
 import androidx.core.view.drawToBitmap
@@ -97,6 +99,9 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
     private var isAspectRatio16_9 = true
 
     val saveOriginal = true
+    val shareAfterSaved = false
+
+
 
     private lateinit var cameraControl: CameraControl
     override fun getViewModel(): Class<MainViewModel> {
@@ -253,30 +258,26 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
 
                         lifecycleScope.launch(Dispatchers.IO) {
                             try {
-                                val inputStream = requireContext().contentResolver.openInputStream(savedUri)
+                                val context = requireContext()
+                                val inputStream = context.contentResolver.openInputStream(savedUri)
                                 var originalBitmap = BitmapFactory.decodeStream(inputStream)
                                 inputStream?.close()
 
                                 if (originalBitmap == null) return@launch
 
-                                // Đọc file ảnh gốc từ URI
                                 val originalFile = File(savedUri.path ?: return@launch)
 
-                                // Xoay bitmap đúng chiều
-                                originalBitmap = rotateBitmapIfRequired(originalBitmap, savedUri, requireContext())
+                                // Xoay ảnh đúng chiều
+                                originalBitmap = rotateBitmapIfRequired(originalBitmap, savedUri, context)
 
-                                // Lấy overlay bitmap từ View
+                                // Lấy overlay bitmap
                                 val overlayBitmap = getBitmapFromView(binding.llMap)
 
-                                // Tạo bitmap mới đã merge overlay
-                                val mergedBitmap = mergeBitmapAtBottomWithMargin(
-                                    originalBitmap,
-                                    overlayBitmap,
-                                    marginBottom = 20
-                                )
+                                // Merge overlay
+                                val mergedBitmap = mergeBitmapAtBottomWithMargin(originalBitmap, overlayBitmap, marginBottom = 20)
 
                                 if (saveOriginal) {
-                                    //Lưu ảnh overlay ra file mới
+                                    // === Lưu overlay ra file mới ===
                                     val overlayFile = File(
                                         Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM),
                                         "IMG_OVERLAY_${System.currentTimeMillis()}.jpg"
@@ -285,36 +286,46 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
                                         mergedBitmap.compress(Bitmap.CompressFormat.JPEG, 100, out)
                                     }
 
-
                                     copyExif(originalFile.absolutePath, overlayFile.absolutePath)
                                     resetExifOrientationToNormal(overlayFile.absolutePath)
 
-                                    // Cập nhật media
-                                    MediaScannerConnection.scanFile(
-                                        requireContext(),
-                                        arrayOf(overlayFile.absolutePath),
-                                        arrayOf("image/jpeg"),
-                                        null
-                                    )
-                                } else {
-                                    // Ghi đè lên file gốc
-                                    requireContext().contentResolver.openOutputStream(savedUri)?.use { outStream ->
-                                        mergedBitmap.compress(Bitmap.CompressFormat.JPEG, 100, outStream)
-                                    }
+                                    // Cập nhật MediaStore
+                                    MediaScannerConnection.scanFile(context, arrayOf(
+                                        overlayFile.absolutePath,
+                                        originalFile.absolutePath
+                                    ), arrayOf("image/jpeg", "image/jpeg"), null)
 
-                                    // Reset orientation
-                                    originalFile.absolutePath.let {
-                                        resetExifOrientationToNormal(it)
+                                    // Chia sẻ nếu cần
+                                    if (shareAfterSaved) {
+                                        withContext(Dispatchers.Main) {
+                                            shareImage(context, overlayFile)
+                                        }
+                                    }
+                                } else {
+                                    // === Ghi đè ảnh gốc ===
+                                    context.contentResolver.openOutputStream(savedUri)?.use { out ->
+                                        mergedBitmap.compress(Bitmap.CompressFormat.JPEG, 100, out)
+                                    }
+                                    resetExifOrientationToNormal(originalFile.absolutePath)
+
+                                    // Cập nhật MediaStore
+                                    MediaScannerConnection.scanFile(context, arrayOf(originalFile.absolutePath), arrayOf("image/jpeg"), null)
+
+                                    if (shareAfterSaved) {
+                                        withContext(Dispatchers.Main) {
+                                            shareImage(context, originalFile)
+                                        }
                                     }
                                 }
 
                                 withContext(Dispatchers.Main) {
                                     Toast.makeText(
-                                        requireContext(),
+                                        context,
                                         if (saveOriginal) "Đã lưu ảnh gốc và ảnh có overlay" else "Đã lưu ảnh có overlay",
                                         Toast.LENGTH_SHORT
                                     ).show()
                                 }
+
                             } catch (e: Exception) {
                                 e.printStackTrace()
                                 withContext(Dispatchers.Main) {
@@ -337,6 +348,22 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
         binding.fabFront.setOnClickListener {
             toggleAspectRatio()
         }
+    }
+
+    private fun shareImage(context: Context, file: File) {
+        val uri = FileProvider.getUriForFile(
+            context,
+            context.packageName + ".provider",
+            file
+        )
+
+        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "image/jpeg"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+
+        context.startActivity(Intent.createChooser(shareIntent, "Chia sẻ ảnh overlay"))
     }
 
     fun copyExif(originalPath: String, newPath: String) {
