@@ -38,6 +38,7 @@ import androidx.camera.core.resolutionselector.AspectRatioStrategy
 import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.media3.effect.Media3Effect
+import androidx.camera.video.FallbackStrategy
 import androidx.camera.video.FileOutputOptions
 import androidx.camera.video.Quality
 import androidx.camera.video.QualitySelector
@@ -129,7 +130,7 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
                                 }
                         }
                     } catch (exc: java.lang.Exception) {
-                        Log.e("NVQ", "Camera Face $camSelector is not supported")
+                        Log.e("namnn266", "Camera Face $camSelector is not supported")
                     }
                 }
             }
@@ -296,6 +297,7 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
                                 )
                             } catch (e: Exception) {
                                 e.printStackTrace()
+                                Log.d("namnn266", "onImageSaved: 11")
                                 withContext(Dispatchers.Main) {
                                     Toast.makeText(
                                         requireContext(),
@@ -336,13 +338,13 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
 
     private suspend fun restartCameraWithNewAspectRatio() {
         try {
-            withContext(Dispatchers.Main) {
-                val cameraProvider = ProcessCameraProvider.getInstance(requireContext()).await()
-                cameraProvider.unbindAll()
-            }
+            val cameraProvider = ProcessCameraProvider.getInstance(requireContext()).await()
+            cameraProvider.unbindAll()
+
             startCamera()
         } catch (e: Exception) {
             e.printStackTrace()
+            Log.d("namnn266", "restartCameraWithNewAspectRatio: 111" + e.message)
             withContext(Dispatchers.Main) {
                 Toast.makeText(
                     requireContext(),
@@ -507,13 +509,14 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
     @OptIn(UnstableApi::class, androidx.camera.camera2.interop.ExperimentalCamera2Interop::class)
     private suspend fun startCamera() {
         enumerationDeferred?.await()
+        changeLayoutParams()
+
         val targetAspectRatio = if (isAspectRatio16_9) {
             AspectRatio.RATIO_16_9
         } else {
             AspectRatio.RATIO_4_3
         }
 
-        changeLayoutParams()
 
         val aspectRatioStrategy = AspectRatioStrategy(
             targetAspectRatio,
@@ -554,11 +557,13 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
 
             imageCapture = imageCaptureBuilder.build()
 
-            // --- VideoCapture với aspect ratio tương ứng ---
-            val videoQuality =
-                if (isAspectRatio16_9) Quality.UHD else Quality.FHD // 4:3 thường dùng FHD
             val recorder = Recorder.Builder()
-                .setQualitySelector(QualitySelector.from(videoQuality))
+                .setQualitySelector(
+                    QualitySelector.fromOrderedList(
+                        listOf(Quality.UHD, Quality.FHD, Quality.HD, Quality.SD),
+                        FallbackStrategy.lowerQualityThan(Quality.FHD)
+                    )
+                )
                 .build()
 
             videoCapture = VideoCapture.withOutput(recorder)
@@ -570,7 +575,7 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
                 .addUseCase(videoCapture)
 
             // --- Media3 Effects ---
-            val videoSize = getSizeForQuality(videoQuality)
+            val videoSize = getSizeForQuality(Quality.UHD)
             val effectBuilder = ImmutableList.Builder<Effect>()
             val overlay = createOverlayEffect(videoSize)
 
@@ -649,6 +654,8 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
                     })
                 }
             } catch (e: Exception) {
+                Log.d("namnn266", "startCamera: "+e.message)
+                Log.d("namnn266", "startCamera: 1111")
                 e.printStackTrace()
             }
 
