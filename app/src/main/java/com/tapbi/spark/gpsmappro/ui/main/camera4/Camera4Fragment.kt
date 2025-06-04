@@ -83,6 +83,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -94,6 +95,8 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
     private val cameraCapabilities = mutableListOf<CameraCapability>()
     private var enumerationDeferred: Deferred<Unit>? = null
     private var isAspectRatio16_9 = true
+
+    val saveOriginal = true
 
     private lateinit var cameraControl: CameraControl
     override fun getViewModel(): Class<MainViewModel> {
@@ -250,60 +253,72 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
 
                         lifecycleScope.launch(Dispatchers.IO) {
                             try {
-                                val inputStream =
-                                    requireContext().contentResolver.openInputStream(savedUri)
+                                val inputStream = requireContext().contentResolver.openInputStream(savedUri)
                                 var originalBitmap = BitmapFactory.decodeStream(inputStream)
                                 inputStream?.close()
 
                                 if (originalBitmap == null) return@launch
-                                originalBitmap = rotateBitmapIfRequired(
-                                    originalBitmap,
-                                    savedUri,
-                                    requireContext()
-                                )
-                                // Tạo bitmap từ view llMap scale đúng với ảnh gốc
 
+                                // Đọc file ảnh gốc từ URI
+                                val originalFile = File(savedUri.path ?: return@launch)
 
-                                // Merge 2 bitmap
+                                // Xoay bitmap đúng chiều
+                                originalBitmap = rotateBitmapIfRequired(originalBitmap, savedUri, requireContext())
+
+                                // Lấy overlay bitmap từ View
+                                val overlayBitmap = getBitmapFromView(binding.llMap)
+
+                                // Tạo bitmap mới đã merge overlay
                                 val mergedBitmap = mergeBitmapAtBottomWithMargin(
                                     originalBitmap,
-                                    getBitmapFromView(binding.llMap),
+                                    overlayBitmap,
                                     marginBottom = 20
                                 )
 
-                                // Ghi đè lại ảnh gốc
-                                requireContext().contentResolver.openOutputStream(savedUri)
-                                    ?.use { outStream ->
-                                        mergedBitmap.compress(
-                                            Bitmap.CompressFormat.JPEG,
-                                            100,
-                                            outStream
-                                        )
+                                if (saveOriginal) {
+                                    //Lưu ảnh overlay ra file mới
+                                    val overlayFile = File(
+                                        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM),
+                                        "IMG_OVERLAY_${System.currentTimeMillis()}.jpg"
+                                    )
+                                    FileOutputStream(overlayFile).use { out ->
+                                        mergedBitmap.compress(Bitmap.CompressFormat.JPEG, 100, out)
                                     }
+
+
+                                    copyExif(originalFile.absolutePath, overlayFile.absolutePath)
+                                    resetExifOrientationToNormal(overlayFile.absolutePath)
+
+                                    // Cập nhật media
+                                    MediaScannerConnection.scanFile(
+                                        requireContext(),
+                                        arrayOf(overlayFile.absolutePath),
+                                        arrayOf("image/jpeg"),
+                                        null
+                                    )
+                                } else {
+                                    // Ghi đè lên file gốc
+                                    requireContext().contentResolver.openOutputStream(savedUri)?.use { outStream ->
+                                        mergedBitmap.compress(Bitmap.CompressFormat.JPEG, 100, outStream)
+                                    }
+
+                                    // Reset orientation
+                                    originalFile.absolutePath.let {
+                                        resetExifOrientationToNormal(it)
+                                    }
+                                }
 
                                 withContext(Dispatchers.Main) {
                                     Toast.makeText(
                                         requireContext(),
-                                        "Ảnh đã được lưu với overlay",
+                                        if (saveOriginal) "Đã lưu ảnh gốc và ảnh có overlay" else "Đã lưu ảnh có overlay",
                                         Toast.LENGTH_SHORT
                                     ).show()
                                 }
-
-                                MediaScannerConnection.scanFile(
-                                    requireContext(),
-                                    arrayOf(outputFileResults.savedUri?.path),
-                                    arrayOf("*/jpg"),
-                                    null
-                                )
                             } catch (e: Exception) {
                                 e.printStackTrace()
-                                Log.d("namnn266", "onImageSaved: 11")
                                 withContext(Dispatchers.Main) {
-                                    Toast.makeText(
-                                        requireContext(),
-                                        "Lỗi: ${e.message}",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
+                                    Toast.makeText(requireContext(), "Lỗi: ${e.message}", Toast.LENGTH_SHORT).show()
                                 }
                             }
                         }
@@ -321,6 +336,52 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
 
         binding.fabFront.setOnClickListener {
             toggleAspectRatio()
+        }
+    }
+
+    fun copyExif(originalPath: String, newPath: String) {
+        try {
+            val originalExif = ExifInterface(originalPath)
+            val newExif = ExifInterface(newPath)
+
+            val attributes = listOf(
+                ExifInterface.TAG_APERTURE_VALUE,
+                ExifInterface.TAG_DATETIME,
+                ExifInterface.TAG_EXPOSURE_TIME,
+                ExifInterface.TAG_FLASH,
+                ExifInterface.TAG_FOCAL_LENGTH,
+                ExifInterface.TAG_GPS_ALTITUDE,
+                ExifInterface.TAG_GPS_ALTITUDE_REF,
+                ExifInterface.TAG_GPS_DATESTAMP,
+                ExifInterface.TAG_GPS_LATITUDE,
+                ExifInterface.TAG_GPS_LATITUDE_REF,
+                ExifInterface.TAG_GPS_LONGITUDE,
+                ExifInterface.TAG_GPS_LONGITUDE_REF,
+                ExifInterface.TAG_GPS_PROCESSING_METHOD,
+                ExifInterface.TAG_GPS_TIMESTAMP,
+                ExifInterface.TAG_ISO_SPEED_RATINGS,
+                ExifInterface.TAG_MAKE,
+                ExifInterface.TAG_MODEL,
+                ExifInterface.TAG_ORIENTATION,
+                ExifInterface.TAG_WHITE_BALANCE
+            )
+
+            for (attr in attributes) {
+                val valStr = originalExif.getAttribute(attr)
+                if (valStr != null) newExif.setAttribute(attr, valStr)
+            }
+            newExif.saveAttributes()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+    fun resetExifOrientationToNormal(imagePath: String) {
+        try {
+            val exif = ExifInterface(imagePath)
+            exif.setAttribute(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL.toString())
+            exif.saveAttributes()
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 
