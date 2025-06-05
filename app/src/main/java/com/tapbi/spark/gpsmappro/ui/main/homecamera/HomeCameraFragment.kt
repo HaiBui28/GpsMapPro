@@ -32,6 +32,7 @@ import androidx.camera.core.resolutionselector.AspectRatioStrategy
 import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.media3.effect.Media3Effect
+import androidx.camera.video.FallbackStrategy
 import androidx.camera.video.FileOutputOptions
 import androidx.camera.video.Quality
 import androidx.camera.video.QualitySelector
@@ -39,6 +40,7 @@ import androidx.camera.video.Recorder
 import androidx.camera.video.Recording
 import androidx.camera.video.VideoCapture
 import androidx.camera.video.VideoRecordEvent
+import androidx.camera.view.PreviewView
 import androidx.concurrent.futures.await
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.constraintlayout.widget.ConstraintSet
@@ -65,6 +67,7 @@ import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.common.collect.ImmutableList
 import com.tapbi.spark.gpsmappro.R
+import com.tapbi.spark.gpsmappro.common.Constant
 import com.tapbi.spark.gpsmappro.common.Constant.CAMERA_INDEX
 import com.tapbi.spark.gpsmappro.common.Constant.QUALITY_INDEX
 import com.tapbi.spark.gpsmappro.data.local.SharedPreferenceHelper
@@ -78,10 +81,14 @@ import com.tapbi.spark.gpsmappro.ui.main.MainViewModel
 import com.tapbi.spark.gpsmappro.utils.Utils
 import com.tapbi.spark.gpsmappro.utils.Utils.dpToPx
 import com.tapbi.spark.gpsmappro.utils.Utils.getSizeForQuality
+import com.tapbi.spark.gpsmappro.utils.Utils.getVideoSize
 import com.tapbi.spark.gpsmappro.utils.clearAllConstraints
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.File
 import java.io.IOException
@@ -90,17 +97,16 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
-class HomeCameraFragment : BaseBindingFragment<FragmentHomeCameraBinding, MainViewModel>(), OnMapReadyCallback {
+class HomeCameraFragment : BaseBindingFragment<FragmentHomeCameraBinding, MainViewModel>(),
+    OnMapReadyCallback {
     private var googleMap: GoogleMap? = null
     private var currentLocation: Location? = null
     var rotation = 0f
     val handler = Handler(Looper.getMainLooper())
     val runnable = Runnable {
         loadMapRotation(rotation)
-        binding.llMap.animate()
-            .rotation(rotation)
-            .setDuration(300)
-            .start()
+        binding.llMap.rotation = rotation
+        updateOverlay()
     }
     val loadMapImageRunnable = Runnable {
         loadBitmapLocation() {
@@ -145,7 +151,11 @@ class HomeCameraFragment : BaseBindingFragment<FragmentHomeCameraBinding, MainVi
             }
         }
         binding.fabVideo.setOnClickListener {
-            if (recording != null) stopRecording() else startRecording()
+            if (recording != null) stopRecording() else {
+                if (SharedPreferenceHelper.containKey(Constant.VIDEO_WIDTH)){
+                    startRecording()
+                }
+            }
         }
         binding.fabPicture.setOnClickListener {
             val photoFile = File(
@@ -170,7 +180,7 @@ class HomeCameraFragment : BaseBindingFragment<FragmentHomeCameraBinding, MainVi
                             "Lỗi lưu ảnh: ${exception.message}",
                             Toast.LENGTH_SHORT
                         ).show()
-                        Log.e("Camera", "Image capture failed", exception)
+                        Timber.e("Camera Image capture failed $exception")
                     }
                 }
             )
@@ -195,7 +205,7 @@ class HomeCameraFragment : BaseBindingFragment<FragmentHomeCameraBinding, MainVi
         binding.balanceBarView.setRotationListener(object : BalanceBarView.RotationListener {
             override fun onRotationChanged(rotation: Float) {
                 if (lifecycle.currentState == Lifecycle.State.RESUMED) {
-                    Log.e("NVQ", "NVQ 23456789 rotation: $rotation")
+                    Timber.e("NVQ NVQ 23456789 rotation: $rotation")
                     this@HomeCameraFragment.rotation = rotation
                     handler.removeCallbacks(runnable)
                     handler.postDelayed(runnable, 300)
@@ -237,7 +247,7 @@ class HomeCameraFragment : BaseBindingFragment<FragmentHomeCameraBinding, MainVi
                                 }
                         }
                     } catch (exc: java.lang.Exception) {
-                        Log.e("NVQ", "Camera Face $camSelector is not supported")
+                        Timber.e("NVQ Camera Face $camSelector is not supported")
                     }
                 }
             }
@@ -246,8 +256,50 @@ class HomeCameraFragment : BaseBindingFragment<FragmentHomeCameraBinding, MainVi
 
     private fun initView() {
         lifecycleScope.launch {
+            Timber.e("NVQ NVQ getsizevideo ++++++++++1111")
             startCamera()
         }
+        binding.previewView.previewStreamState.observe(viewLifecycleOwner) { state ->
+            if (state == PreviewView.StreamState.STREAMING) {
+                Utils.safeDelay(1050) {
+                    loadVideoSize()
+                }
+            }
+        }
+
+    }
+
+    var onLoadingVideoSize: Boolean = false
+    fun loadVideoSize() {
+        if (!SharedPreferenceHelper.containKey(Constant.VIDEO_WIDTH)) {
+            Timber.e("NVQ NVQ getsizevideo ++++++++++")
+            onLoadingVideoSize = true
+            val videoOutputFile = File(
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM),
+                "videoSize.mp4"
+            )
+            val output = FileOutputOptions.Builder(videoOutputFile).build()
+            recording = videoCapture.output
+                .prepareRecording(requireContext(), output)
+                .start(cameraExecutor) { recordEvent ->
+                    if (recordEvent is VideoRecordEvent.Finalize) {
+                        val size = getVideoSize(output.file.absolutePath)
+                        size?.let {
+                            SharedPreferenceHelper.storeInt(Constant.VIDEO_WIDTH, it.width)
+                            SharedPreferenceHelper.storeInt(Constant.VIDEO_HEIGHT, it.height)
+                        }
+                        Timber.e("NVQ NVQ getsizevideo $size")
+                        onLoadingVideoSize = false
+                        recording = null
+                    } else if (recordEvent is VideoRecordEvent.Start) {
+                        Utils.safeDelay(1050) {
+                            recording?.stop()
+                            recording = null
+                        }
+                    }
+                }
+        }
+
     }
 
 
@@ -274,8 +326,18 @@ class HomeCameraFragment : BaseBindingFragment<FragmentHomeCameraBinding, MainVi
         Timber.e("NVQ startCamera+++1")
         enumerationDeferred?.await()
         Timber.e("NVQ startCamera+++2")
-        val aspectRatioStrategy = AspectRatioStrategy(AspectRatio.RATIO_16_9, AspectRatioStrategy.FALLBACK_RULE_AUTO)
-        val resolutionSelector = ResolutionSelector.Builder().setAspectRatioStrategy(aspectRatioStrategy).build()
+        val aspectRatioStrategy =
+            AspectRatioStrategy(AspectRatio.RATIO_16_9, AspectRatioStrategy.FALLBACK_RULE_AUTO)
+        binding.previewView.apply {
+            layoutParams = layoutParams.apply {
+                if (this is ConstraintLayout.LayoutParams) {
+                    dimensionRatio = "9:16"
+                }
+
+            }
+        }
+        val resolutionSelector =
+            ResolutionSelector.Builder().setAspectRatioStrategy(aspectRatioStrategy).build()
         val cameraProviderFuture = ProcessCameraProvider.getInstance(requireContext())
         cameraProviderFuture.addListener({
             Timber.e("NVQ startCamera+++3")
@@ -290,6 +352,7 @@ class HomeCameraFragment : BaseBindingFragment<FragmentHomeCameraBinding, MainVi
             val cameraSelector = getCameraSelector()
             val recorder = Recorder.Builder()
                 .setQualitySelector(getQuality())
+                .setAspectRatio(AspectRatio.RATIO_16_9)
                 .build()
             videoCapture = VideoCapture.withOutput(recorder)
             val useCaseGroup = UseCaseGroup.Builder().addUseCase(preview).addUseCase(imageCapture!!)
@@ -316,11 +379,17 @@ class HomeCameraFragment : BaseBindingFragment<FragmentHomeCameraBinding, MainVi
 
     @OptIn(UnstableApi::class)
     fun updateOverlay() {
-        Utils.safeDelay(500) {
+        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+            while (onLoadingVideoSize || !SharedPreferenceHelper.containKey(Constant.VIDEO_WIDTH)) {
+                delay(50)
+            }
+            delay(300)
             val effect = ImmutableList.Builder<Effect>()
-            val overlay = createOverlayEffect(getSizeForQuality(cameraCapabilities[cameraIndex].qualities[qualityIndex]))
-            overlay?.let { effect.add(it) }
-            media3Effect?.setEffects(effect.build())
+            val overlay = createOverlayEffect()
+            withContext(Dispatchers.Main){
+                overlay?.let { effect.add(it) }
+                media3Effect?.setEffects(effect.build())
+            }
         }
     }
 
@@ -350,6 +419,9 @@ class HomeCameraFragment : BaseBindingFragment<FragmentHomeCameraBinding, MainVi
                         null
                     )
                     recording = null
+                    binding.fabVideo.setImageResource(R.drawable.ic_videocam_black_24dp)
+                } else if (recordEvent is VideoRecordEvent.Start){
+                    binding.fabVideo.setImageResource(R.drawable.ic_stop_black_24dp)
                 }
             }
     }
@@ -360,16 +432,16 @@ class HomeCameraFragment : BaseBindingFragment<FragmentHomeCameraBinding, MainVi
     }
 
     @UnstableApi
-    private fun createOverlayEffect(videoSize: Size): OverlayEffect? {
-        Log.e("NVQ", "createOverlayEffect++++")
+    private fun createOverlayEffect(): OverlayEffect? {
+        Timber.e("NVQ createOverlayEffect++++")
         val overlayBuilder = ImmutableList.Builder<TextureOverlay>()
         val settings = StaticOverlaySettings.Builder()
             .setAlphaScale(1f)
             .build()
         val bitmapOverlay = BitmapOverlay.createStaticBitmapOverlay(
             createHelloTextBitmap(
-                videoSize.height,
-                videoSize.width
+                SharedPreferenceHelper.getInt(Constant.VIDEO_WIDTH),
+                SharedPreferenceHelper.getInt(Constant.VIDEO_HEIGHT)
             ), settings
         )
         overlayBuilder.add(bitmapOverlay)
@@ -383,7 +455,10 @@ class HomeCameraFragment : BaseBindingFragment<FragmentHomeCameraBinding, MainVi
 
     private fun getQuality(): QualitySelector {
         val quality = cameraCapabilities[cameraIndex].qualities[qualityIndex]
-        val qualitySelector = QualitySelector.from(quality)
+        val qualitySelector = QualitySelector.fromOrderedList(
+            listOf(Quality.UHD, Quality.FHD, Quality.HD, Quality.SD),
+            FallbackStrategy.lowerQualityThan(quality)
+        )
         return qualitySelector
     }
 
@@ -469,13 +544,18 @@ class HomeCameraFragment : BaseBindingFragment<FragmentHomeCameraBinding, MainVi
     }
 
     fun loadBitmapLocation(onCompletion: () -> Unit) {
-        googleMap?.snapshot { mapBitmap ->
-            if (mapBitmap != null) {
-                binding.imMapSnapshot.visibility = View.VISIBLE
-                binding.imMapSnapshot.setImageBitmap(mapBitmap)
-                Log.e("NVQ", "loadBitmapLocation11111")
-                onCompletion()
+        try {
+            if (lifecycle.currentState == Lifecycle.State.RESUMED) {
+                googleMap?.snapshot { mapBitmap ->
+                    if (mapBitmap != null) {
+                        binding.imMapSnapshot.visibility = View.VISIBLE
+                        binding.imMapSnapshot.setImageBitmap(mapBitmap)
+                        Timber.e("NVQ loadBitmapLocation11111")
+                        onCompletion()
+                    }
+                }
             }
+        } catch (e: Exception) {
         }
     }
 
@@ -524,6 +604,7 @@ class HomeCameraFragment : BaseBindingFragment<FragmentHomeCameraBinding, MainVi
     }
 
     companion object {
-        private val CAMERA_LENS = arrayOf(CameraCharacteristics.LENS_FACING_FRONT, CameraCharacteristics.LENS_FACING_BACK)
+        private val CAMERA_LENS =
+            arrayOf(CameraCharacteristics.LENS_FACING_FRONT, CameraCharacteristics.LENS_FACING_BACK)
     }
 }

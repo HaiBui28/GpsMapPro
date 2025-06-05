@@ -22,6 +22,8 @@ import com.tapbi.spark.gpsmappro.feature.BalanceBarView.Companion.Rotation_4
 import timber.log.Timber
 import java.io.ByteArrayOutputStream
 import kotlin.math.roundToInt
+import android.media.MediaMetadataRetriever
+import java.io.File
 
 object Utils {
     fun dpToPx(dp: Int): Int {
@@ -131,6 +133,25 @@ object Utils {
 //
 //        return result
 //    }
+
+    fun getVideoSize(videoPath: String): Size? {
+        val retriever = MediaMetadataRetriever()
+        return try {
+            retriever.setDataSource(videoPath)
+            val width = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull()
+            val height = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull()
+            if (width != null && height != null) {
+                val file = File(videoPath)
+                if (file.exists()) { file.delete() }
+                Size(width, height)
+            } else null
+        } catch (e: Exception) {
+            Timber.e("NVQ 51132231 $e")
+            null
+        } finally {
+            retriever.release()
+        }
+    }
 
 
     fun imageProxyToBitmap(image: ImageProxy): Bitmap {

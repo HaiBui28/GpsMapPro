@@ -1,6 +1,7 @@
 package com.tapbi.spark.gpsmappro
 
 import android.app.Application
+import android.util.Log
 import androidx.multidex.BuildConfig
 import com.tapbi.spark.gpsmappro.common.model.FolderPhotoModel
 import com.tapbi.spark.gpsmappro.data.local.SharedPreferenceHelper
@@ -32,9 +33,7 @@ class App : Application() {
 
 
     private fun initLog() {
-        if (BuildConfig.DEBUG) {
-            Timber.plant(MyDebugTree())
-        }
+        Timber.plant(MyDebugTree())
     }
 
 //    override fun onConfigurationChanged(newConfig: Configuration) {

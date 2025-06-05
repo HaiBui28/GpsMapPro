@@ -18,4 +18,6 @@ object Constant {
     const val CAMERA_INDEX = "CAMERA_INDEX"
     const val CAMERA_FRONT = "CAMERA_FRONT"
     const val CAMERA_BACK = "CAMERA_BACK"
+    const val VIDEO_WIDTH = "video_width"
+    const val VIDEO_HEIGHT = "video_height"
 }
