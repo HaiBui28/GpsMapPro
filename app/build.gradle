@@ -130,6 +130,7 @@ dependencies {
     implementation "androidx.camera:camera-video:$camerax_version"
     implementation "androidx.camera:camera-view:$camerax_version"
     implementation "androidx.camera:camera-effects:$camerax_version"
+    implementation "androidx.concurrent:concurrent-futures-ktx:1.2.0"
 //    implementation project(":flagkit")
     implementation project(":gpuv")
     implementation project(":library")

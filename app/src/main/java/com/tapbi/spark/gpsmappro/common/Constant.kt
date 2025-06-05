@@ -13,4 +13,9 @@ object Constant {
     const val COLOR_BACKGROUND = "COLOR_BACKGROUND"
     const val ASSET_PATH = "file:///android_asset/"
     const val REQUEST_READ_EXTERNAL_STORAGE = 1
+
+    const val QUALITY_INDEX = "QUALITY_INDEX"
+    const val CAMERA_INDEX = "CAMERA_INDEX"
+    const val CAMERA_FRONT = "CAMERA_FRONT"
+    const val CAMERA_BACK = "CAMERA_BACK"
 }

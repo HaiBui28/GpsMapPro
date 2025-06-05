@@ -12,8 +12,10 @@ import android.graphics.YuvImage
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.util.Size
 import android.view.View
 import androidx.camera.core.ImageProxy
+import androidx.camera.video.Quality
 import com.tapbi.spark.gpsmappro.feature.BalanceBarView.Companion.Rotation_2
 import com.tapbi.spark.gpsmappro.feature.BalanceBarView.Companion.Rotation_3
 import com.tapbi.spark.gpsmappro.feature.BalanceBarView.Companion.Rotation_4
@@ -164,6 +166,15 @@ object Utils {
         val canvas = Canvas(resultBitmap)
         canvas.drawBitmap(overlayBitmap, x, y, null)
         return resultBitmap
+    }
+    fun getSizeForQuality(quality: Quality): Size {
+        return when (quality) {
+            Quality.UHD -> Size(3840, 2160)
+            Quality.FHD -> Size(1920, 1080)
+            Quality.HD  -> Size(1280, 720)
+            Quality.SD  -> Size(720, 480)
+            else -> Size(1280, 720)
+        }
     }
     fun safeDelay(delayMillis: Long = 0, action: () -> Unit) {
         Handler(Looper.getMainLooper()).postDelayed({

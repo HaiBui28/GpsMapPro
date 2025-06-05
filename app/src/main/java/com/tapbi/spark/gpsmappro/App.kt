@@ -3,6 +3,7 @@ package com.tapbi.spark.gpsmappro
 import android.app.Application
 import androidx.multidex.BuildConfig
 import com.tapbi.spark.gpsmappro.common.model.FolderPhotoModel
+import com.tapbi.spark.gpsmappro.data.local.SharedPreferenceHelper
 import com.tapbi.spark.gpsmappro.utils.MyDebugTree
 import dagger.hilt.android.HiltAndroidApp
 import io.reactivex.rxjava3.plugins.RxJavaPlugins
@@ -25,6 +26,7 @@ class App : Application() {
                 t
             )
         }
+        SharedPreferenceHelper.init(this)
         initLog()
     }
 

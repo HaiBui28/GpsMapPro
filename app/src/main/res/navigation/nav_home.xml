@@ -42,4 +42,8 @@
         android:id="@+id/camera6Fragment"
         android:name="com.tapbi.spark.gpsmappro.ui.camera6.Camera6Fragment"
         android:label="Camera6Fragment" />
+    <fragment
+        android:id="@+id/homeCameraFragment"
+        android:name="com.tapbi.spark.gpsmappro.ui.main.homecamera.HomeCameraFragment"
+        android:label="HomeCameraFragment" />
 </navigation>
