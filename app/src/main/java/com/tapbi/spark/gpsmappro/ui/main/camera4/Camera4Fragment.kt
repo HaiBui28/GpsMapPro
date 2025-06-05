@@ -12,6 +12,8 @@ import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Typeface
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraManager
 import android.hardware.camera2.CaptureRequest
 import android.media.MediaScannerConnection
 import android.net.Uri
@@ -23,6 +25,8 @@ import android.util.Log
 import android.util.Size
 import android.view.Surface
 import android.view.View
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
 import android.widget.SeekBar
 import android.widget.Toast
 import androidx.annotation.OptIn
@@ -41,7 +45,6 @@ import androidx.camera.core.resolutionselector.AspectRatioStrategy
 import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.media3.effect.Media3Effect
-import androidx.camera.video.FallbackStrategy
 import androidx.camera.video.FileOutputOptions
 import androidx.camera.video.Quality
 import androidx.camera.video.QualitySelector
@@ -71,6 +74,7 @@ import com.google.android.gms.location.LocationServices
 import com.google.common.collect.ImmutableList
 import com.tapbi.spark.gpsmappro.App
 import com.tapbi.spark.gpsmappro.R
+import com.tapbi.spark.gpsmappro.common.model.WhiteBalanceMode
 import com.tapbi.spark.gpsmappro.databinding.FragmentCamera4Binding
 import com.tapbi.spark.gpsmappro.feature.BalanceBarView
 import com.tapbi.spark.gpsmappro.feature.BalanceBarView.Companion.Rotation_2
@@ -100,6 +104,47 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
     private var enumerationDeferred: Deferred<Unit>? = null
     private var isAspectRatio16_9 = true
     private var typeGrid = 0
+    private var selectedWhiteBalanceMode: WhiteBalanceMode = WhiteBalanceMode.AUTO
+
+
+    private fun setupWhiteBalanceSpinner() {
+        val cameraManager = context?.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+        val cameraId = cameraManager.cameraIdList.firstOrNull() ?: return
+        val supportedModes = getSupportedWhiteBalanceModes(requireContext(), cameraId)
+
+        Log.d("namnn266", "setupWhiteBalanceSpinner: " + supportedModes)
+
+        val adapter = ArrayAdapter(
+            requireContext(),
+            android.R.layout.simple_spinner_item,
+            supportedModes.map { it.displayName }
+        )
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        binding.spinnerWhiteBalance.adapter = adapter
+
+        binding.spinnerWhiteBalance.onItemSelectedListener =
+            object : AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(
+                    parent: AdapterView<*>?,
+                    view: View?,
+                    position: Int,
+                    id: Long
+                ) {
+                    selectedWhiteBalanceMode = supportedModes[position]
+                    restartCameraWithAWB(selectedWhiteBalanceMode.awbMode)
+                }
+
+                override fun onNothingSelected(parent: AdapterView<*>?) {}
+            }
+    }
+
+
+    private fun restartCameraWithAWB(awbMode: Int) {
+        lifecycleScope.launch {
+            ProcessCameraProvider.getInstance(requireContext()).get().unbindAll()
+            startCamera(awbMode)
+        }
+    }
 
 
     private var sizeVideo: Size = Size(1920, 1080)
@@ -241,6 +286,7 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
             requestPermissions(REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS)
         }
 
+        setupWhiteBalanceSpinner()
         binding.fabPicture.setOnClickListener {
             val photoFile = File(
                 Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM),
@@ -625,7 +671,7 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
         androidx.camera.camera2.interop.ExperimentalCamera2Interop::class,
         ExperimentalGetImage::class
     )
-    private suspend fun startCamera() {
+    private suspend fun startCamera(awbMode: Int = CaptureRequest.CONTROL_AWB_MODE_AUTO) {
         enumerationDeferred?.await()
         changeLayoutParams()
 
@@ -651,7 +697,7 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
             val cameraProvider = cameraProviderFuture.get()
 
             // --- Cân bằng trắng: bạn có thể thay đổi sang AUTO, INCANDESCENT, etc.
-            val awbMode = CaptureRequest.CONTROL_AWB_MODE_AUTO
+//            val awbMode = CaptureRequest.CONTROL_AWB_MODE_AUTO
 
             // --- Preview Builder + WB ---
             val previewBuilder = Preview.Builder()
@@ -720,13 +766,15 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
                 cameraControl = camera.cameraControl
                 val cameraInfo = camera.cameraInfo
 
-                 sizeVideo = if (isAspectRatio16_9) {
+                sizeVideo = if (isAspectRatio16_9) {
                     QualitySelector.getResolution(cameraInfo, Quality.HIGHEST)!!
                 } else {
-                    predictVideoSizeWithLimit(camera.cameraInfo,
+                    predictVideoSizeWithLimit(
+                        camera.cameraInfo,
                         Quality.FHD,
                         aspectRatioWidth = 4,
-                        aspectRatioHeight = 3)
+                        aspectRatioHeight = 3
+                    )
                 }
 
                 for (quality in QualitySelector.getSupportedQualities(cameraInfo)) {
@@ -914,6 +962,35 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
         val scaledBitmap = mapBitmap.scale(width, height)
 
         return scaledBitmap
+    }
+
+
+    fun getSupportedWhiteBalanceModes(context: Context, cameraId: String): List<WhiteBalanceMode> {
+        try {
+            val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+            val characteristics = cameraManager.getCameraCharacteristics(cameraId)
+            val supportedHardwareModes =
+                characteristics.get(CameraCharacteristics.CONTROL_AWB_AVAILABLE_MODES)
+                    ?: intArrayOf()
+            val allAppModes = WhiteBalanceMode.values()
+            val filteredModes = allAppModes.filter { mode ->
+                supportedHardwareModes.contains(mode.awbMode)
+            }
+
+            if (filteredModes.isEmpty() && supportedHardwareModes.contains(CaptureRequest.CONTROL_AWB_MODE_AUTO)) {
+                return listOfNotNull(allAppModes.find { it.awbMode == CaptureRequest.CONTROL_AWB_MODE_AUTO })
+            }
+            if (filteredModes.isEmpty()) {
+                return listOf(WhiteBalanceMode.AUTO)
+            }
+            return filteredModes
+
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return listOfNotNull(
+                WhiteBalanceMode.values()
+                    .find { it.awbMode == CaptureRequest.CONTROL_AWB_MODE_AUTO })
+        }
     }
 
 
