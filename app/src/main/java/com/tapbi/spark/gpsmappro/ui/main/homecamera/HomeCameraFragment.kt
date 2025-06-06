@@ -5,6 +5,7 @@ import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CaptureRequest
 import android.location.Geocoder
 import android.location.Location
 import android.media.MediaScannerConnection
@@ -13,12 +14,18 @@ import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.util.Range
 import android.util.Size
 import android.view.MotionEvent
 import android.view.View
 import android.widget.Toast
 import androidx.annotation.OptIn
 import androidx.annotation.RequiresPermission
+import androidx.camera.camera2.interop.Camera2CameraControl
+import androidx.camera.camera2.interop.Camera2CameraInfo
+import androidx.camera.camera2.interop.Camera2Interop
+import androidx.camera.camera2.interop.CaptureRequestOptions
+import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.core.AspectRatio
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraEffect
@@ -115,10 +122,10 @@ class HomeCameraFragment : BaseBindingFragment<FragmentHomeCameraBinding, MainVi
     }
     private var cameraIndex: Int
         get(): Int = SharedPreferenceHelper.getInt(CAMERA_INDEX, 0)
-        set(index) = SharedPreferenceHelper.storeInt(CAMERA_INDEX, index)
+        set(index) = SharedPreferenceHelper.putInt(CAMERA_INDEX, index)
     private var qualityIndex: Int
         get(): Int = SharedPreferenceHelper.getInt(QUALITY_INDEX, 0)
-        set(index) = SharedPreferenceHelper.storeInt(QUALITY_INDEX, index)
+        set(index) = SharedPreferenceHelper.putInt(QUALITY_INDEX, index)
     private var imageCapture: ImageCapture? = null
     private var media3Effect: Media3Effect? = null
     private lateinit var videoCapture: VideoCapture<Recorder>
@@ -141,7 +148,7 @@ class HomeCameraFragment : BaseBindingFragment<FragmentHomeCameraBinding, MainVi
         initGoogleMap()
         initChangeRotation()
     }
-
+    var isPausing = false
     @SuppressLint("ClickableViewAccessibility")
     private fun initListener() {
         binding.fabFront.setOnClickListener {
@@ -167,7 +174,7 @@ class HomeCameraFragment : BaseBindingFragment<FragmentHomeCameraBinding, MainVi
             val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
             imageCapture?.takePicture(
                 outputOptions,
-                ContextCompat.getMainExecutor(requireContext()),
+                cameraExecutor,
                 object : ImageCapture.OnImageSavedCallback {
                     override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
                         Toast.makeText(requireContext(), "Lưu ảnh thành công!", Toast.LENGTH_SHORT)
@@ -184,6 +191,20 @@ class HomeCameraFragment : BaseBindingFragment<FragmentHomeCameraBinding, MainVi
                     }
                 }
             )
+        }
+        binding.fabRatio.setOnClickListener {
+            if (isPausing){
+                recording?.let {
+                    isPausing = false
+                    it.resume()
+                }
+            } else {
+                recording?.let {
+                    isPausing = true
+                    it.pause()
+                }
+            }
+
         }
         binding.previewView.setOnTouchListener { _, event ->
             if (event.action != MotionEvent.ACTION_UP) return@setOnTouchListener true
@@ -285,8 +306,8 @@ class HomeCameraFragment : BaseBindingFragment<FragmentHomeCameraBinding, MainVi
                     if (recordEvent is VideoRecordEvent.Finalize) {
                         val size = getVideoSize(output.file.absolutePath)
                         size?.let {
-                            SharedPreferenceHelper.storeInt(Constant.VIDEO_WIDTH, it.width)
-                            SharedPreferenceHelper.storeInt(Constant.VIDEO_HEIGHT, it.height)
+                            SharedPreferenceHelper.putInt(Constant.VIDEO_WIDTH, it.width)
+                            SharedPreferenceHelper.putInt(Constant.VIDEO_HEIGHT, it.height)
                         }
                         Timber.e("NVQ NVQ getsizevideo $size")
                         onLoadingVideoSize = false
@@ -321,7 +342,7 @@ class HomeCameraFragment : BaseBindingFragment<FragmentHomeCameraBinding, MainVi
     //+++++++++++++++++++++++++++++++++++++ Camera +++++++++++++++++++++++++++++++
     data class CameraCapability(val camSelector: CameraSelector, val qualities: List<Quality>)
 
-    @OptIn(UnstableApi::class)
+    @OptIn(ExperimentalCamera2Interop::class)
     private suspend fun startCamera() {
         Timber.e("NVQ startCamera+++1")
         enumerationDeferred?.await()
@@ -371,6 +392,21 @@ class HomeCameraFragment : BaseBindingFragment<FragmentHomeCameraBinding, MainVi
                     cameraSelector,
                     useCaseGroup.build()
                 )
+                val camera2Control = Camera2CameraControl.from(camera!!.cameraControl)
+                val camera2Info = Camera2CameraInfo.from(camera!!.cameraInfo)
+                val supportedFpsRanges = camera2Info.getCameraCharacteristic(
+                    CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES
+                )
+                if (supportedFpsRanges != null) {
+                    for (range in supportedFpsRanges) {
+                        Timber.e("NVQ supportedFpsRanges++++ $range")
+                    }
+                }
+                camera2Control.setCaptureRequestOptions(
+                    CaptureRequestOptions.Builder()
+                        .setCaptureRequestOption(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, supportedFpsRanges!!.last())
+                        .build()
+                )
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -408,7 +444,7 @@ class HomeCameraFragment : BaseBindingFragment<FragmentHomeCameraBinding, MainVi
         recording = videoCapture.output
             .prepareRecording(requireContext(), output)
             .withAudioEnabled()
-            .start(ContextCompat.getMainExecutor(requireContext())) { recordEvent ->
+            .start(cameraExecutor) { recordEvent ->
                 if (recordEvent is VideoRecordEvent.Finalize) {
                     Toast.makeText(context, "Video saved: ${output.file}", Toast.LENGTH_SHORT)
                         .show()
@@ -455,9 +491,10 @@ class HomeCameraFragment : BaseBindingFragment<FragmentHomeCameraBinding, MainVi
 
     private fun getQuality(): QualitySelector {
         val quality = cameraCapabilities[cameraIndex].qualities[qualityIndex]
-        val qualitySelector = QualitySelector.fromOrderedList(
-            listOf(Quality.UHD, Quality.FHD, Quality.HD, Quality.SD),
-            FallbackStrategy.lowerQualityThan(quality)
+        Timber.e("NVQ getQuality++++ $quality")
+        val qualitySelector = QualitySelector.from(
+            quality,
+            FallbackStrategy.higherQualityOrLowerThan(Quality.SD)
         )
         return qualitySelector
     }
