@@ -115,10 +115,10 @@ class HomeCameraFragment : BaseBindingFragment<FragmentHomeCameraBinding, MainVi
     }
     private var cameraIndex: Int
         get(): Int = SharedPreferenceHelper.getInt(CAMERA_INDEX, 0)
-        set(index) = SharedPreferenceHelper.storeInt(CAMERA_INDEX, index)
+        set(index) = SharedPreferenceHelper.putInt(CAMERA_INDEX, index)
     private var qualityIndex: Int
         get(): Int = SharedPreferenceHelper.getInt(QUALITY_INDEX, 0)
-        set(index) = SharedPreferenceHelper.storeInt(QUALITY_INDEX, index)
+        set(index) = SharedPreferenceHelper.putInt(QUALITY_INDEX, index)
     private var imageCapture: ImageCapture? = null
     private var media3Effect: Media3Effect? = null
     private lateinit var videoCapture: VideoCapture<Recorder>
@@ -285,8 +285,8 @@ class HomeCameraFragment : BaseBindingFragment<FragmentHomeCameraBinding, MainVi
                     if (recordEvent is VideoRecordEvent.Finalize) {
                         val size = getVideoSize(output.file.absolutePath)
                         size?.let {
-                            SharedPreferenceHelper.storeInt(Constant.VIDEO_WIDTH, it.width)
-                            SharedPreferenceHelper.storeInt(Constant.VIDEO_HEIGHT, it.height)
+                            SharedPreferenceHelper.putInt(Constant.VIDEO_WIDTH, it.width)
+                            SharedPreferenceHelper.putInt(Constant.VIDEO_HEIGHT, it.height)
                         }
                         Timber.e("NVQ NVQ getsizevideo $size")
                         onLoadingVideoSize = false
