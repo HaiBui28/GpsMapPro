@@ -202,5 +202,23 @@ object SharedPreferenceHelper {
             emptyList()
         }
     }
+    inline fun <reified K, reified V> putObjectMap(key: String, map: Map<K, V>) {
+        val json = Gson().toJson(map)
+        putString(key, json)
+    }
+    inline fun <reified K, reified V> getObjectMap(key: String): Map<K, V> {
+        val json = getString(key)
+        return if (!json.isNullOrEmpty()) {
+            try {
+                val type = object : TypeToken<Map<K, V>>() {}.type
+                Gson().fromJson(json, type)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                emptyMap()
+            }
+        } else {
+            emptyMap()
+        }
+    }
 
 }
