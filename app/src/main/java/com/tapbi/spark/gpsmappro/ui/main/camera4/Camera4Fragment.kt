@@ -12,9 +12,11 @@ import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Typeface
+import android.hardware.camera2.CameraAccessException
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.hardware.camera2.CaptureRequest
+import android.media.MediaRecorder
 import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Bundle
@@ -97,6 +99,8 @@ import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.abs
+
 
 class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewModel>() {
     private var cameraIndex = 0
@@ -748,7 +752,7 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
             val recorder = Recorder.Builder()
                 .setQualitySelector(
                     QualitySelector.from(
-                        Quality.HIGHEST
+                        Quality.FHD
                     )
                 )
                 .setAspectRatio(targetAspectRatio)
@@ -764,9 +768,7 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
 
 
             // --- Media3 Effects ---
-            val videoSize = getSizeForQuality(Quality.UHD)
             val effectBuilder = ImmutableList.Builder<Effect>()
-
 
             media3Effect = Media3Effect(
                 requireContext(),
@@ -782,30 +784,24 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
 
                 val camera = cameraProvider.bindToLifecycle(
                     viewLifecycleOwner,
-                    CameraSelector.DEFAULT_BACK_CAMERA,
+                    CameraSelector.DEFAULT_FRONT_CAMERA,
                     useCaseGroup.build()
                 )
-
+                binding.previewView.scaleX = -1f
                 cameraControl = camera.cameraControl
                 val cameraInfo = camera.cameraInfo
+
 
                 sizeVideo = if (isAspectRatio16_9) {
                     QualitySelector.getResolution(cameraInfo, Quality.HIGHEST)!!
                 } else {
-                    predictVideoSizeWithLimit(
-                        camera.cameraInfo,
-                        Quality.FHD,
-                        aspectRatioWidth = 4,
-                        aspectRatioHeight = 3
-                    )
+                    getBest43SizeUnderFHD(
+                        requireContext(),
+                        cameraInfo,
+                        CameraCharacteristics.LENS_FACING_FRONT
+                    )!!
                 }
-
-                for (quality in QualitySelector.getSupportedQualities(cameraInfo)) {
-                    val size = QualitySelector.getResolution(cameraInfo, quality) ?: continue
-                    val ratio = size.width.toFloat() / size.height
-                    Log.d("VideoSizeCheck", "Quality: $quality, Size: $size, Ratio: $ratio")
-                }
-                val overlay = sizeVideo?.let { createOverlayEffect(it) }
+                val overlay = createOverlayEffect(sizeVideo)
                 overlay?.let { effectBuilder.add(it) }
                 media3Effect?.setEffects(effectBuilder.build())
 
@@ -870,33 +866,123 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
         }, cameraExecutor)
     }
 
+
+    fun getBest43SizeUnderFHD(
+        context: Context,
+        cameraInfo: CameraInfo?,
+        lensFacing: Int // CameraCharacteristics.LENS_FACING_BACK hoặc LENS_FACING_FRONT
+    ): Size? {
+        try {
+            val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+            val cameraId = cameraManager.cameraIdList.firstOrNull { id ->
+                val characteristics = cameraManager.getCameraCharacteristics(id)
+                characteristics.get(CameraCharacteristics.LENS_FACING) == lensFacing
+            } ?: return null // Không tìm thấy camera với lensFacing yêu cầu
+
+            val characteristics = cameraManager.getCameraCharacteristics(cameraId)
+            val map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+                ?: return null
+
+            val videoSizes = map.getOutputSizes(MediaRecorder::class.java)
+
+            // Lọc size tỉ lệ 4:3
+            val sizes4_3 = videoSizes.filter { size ->
+                val ratio = size.width.toFloat() / size.height
+                abs(ratio - 4f / 3f) < 0.01f
+            }
+
+            // Lấy độ phân giải FHD từ CameraX QualitySelector
+            val fhdSize = QualitySelector.getResolution(cameraInfo!!, Quality.FHD)
+            val uhdSize = QualitySelector.getResolution(cameraInfo, Quality.UHD)
+            val fhdWidth = fhdSize?.width ?: 1920
+            val fhdHeight = fhdSize?.height ?: 1080
+
+            // Tìm size phù hợp nhất
+            val bestMatch = if (uhdSize == null) {
+                sizes4_3.firstOrNull { it.height == fhdHeight }
+            } else {
+                sizes4_3
+                    .filter { it.width < fhdWidth && it.height >= fhdHeight }
+                    .maxByOrNull { it.width }
+            }
+
+            Log.d("chungvv", "Best 4:3 size (facing=$lensFacing): $bestMatch")
+            return bestMatch
+
+        } catch (e: CameraAccessException) {
+            e.printStackTrace()
+            return null
+        }
+    }
+
+
+//    fun predictVideoSizeWithLimit(
+//        cameraInfo: CameraInfo,
+//        quality: Quality,
+//        aspectRatioWidth: Int,
+//        aspectRatioHeight: Int
+//    ): Size {
+//        val resolution = QualitySelector.getResolution(cameraInfo, quality) ?: return Size(1280, 960)
+//
+//        val widthStandard = resolution.width
+//        val heightStandard = resolution.height
+//
+//        val ratioStandard = widthStandard.toFloat() / heightStandard
+//        val ratioTarget = aspectRatioWidth.toFloat() / aspectRatioHeight
+//
+//        val predictedSize = if (ratioStandard > ratioTarget) {
+//            Size((heightStandard * aspectRatioWidth) / aspectRatioHeight, heightStandard)
+//        } else {
+//            Size(widthStandard, (widthStandard * aspectRatioHeight) / aspectRatioWidth)
+//        }
+//
+//        // Giới hạn kích thước tối đa để tránh quá lớn
+//        val maxWidth = 1920 // ví dụ giới hạn Full HD
+//        val maxHeight = 1440 // ví dụ giới hạn chiều cao 4:3 tương ứng
+//
+//        val finalWidth = minOf(predictedSize.width, maxWidth)
+//        val finalHeight = minOf(predictedSize.height, maxHeight)
+//
+//        return Size(finalWidth, finalHeight)
+//    }
+
     fun predictVideoSizeWithLimit(
         cameraInfo: CameraInfo,
         quality: Quality,
         aspectRatioWidth: Int,
-        aspectRatioHeight: Int
+        aspectRatioHeight: Int,
+        maxWidth: Int = 1920,
+        maxHeight: Int = 1440
     ): Size {
-        val resolution = QualitySelector.getResolution(cameraInfo, quality) ?: return Size(1280, 960)
-
-        val widthStandard = resolution.width
-        val heightStandard = resolution.height
-
-        val ratioStandard = widthStandard.toFloat() / heightStandard
-        val ratioTarget = aspectRatioWidth.toFloat() / aspectRatioHeight
-
-        val predictedSize = if (ratioStandard > ratioTarget) {
-            Size((heightStandard * aspectRatioWidth) / aspectRatioHeight, heightStandard)
+        val resolution = QualitySelector.getResolution(cameraInfo, quality)
+            ?: return Size(1280, 960)
+        val sensorWidth = resolution.width
+        val sensorHeight = resolution.height
+        val targetRatio = aspectRatioWidth.toFloat() / aspectRatioHeight
+        val sensorRatio = sensorWidth.toFloat() / sensorHeight
+        val isSensorLandscape = sensorWidth >= sensorHeight
+        val isTargetLandscape = aspectRatioWidth >= aspectRatioHeight
+        // Điều chỉnh aspect ratio nếu orientation khác nhau
+        val (ratioW, ratioH) = if (isSensorLandscape != isTargetLandscape) {
+            aspectRatioHeight to aspectRatioWidth
         } else {
-            Size(widthStandard, (widthStandard * aspectRatioHeight) / aspectRatioWidth)
+            aspectRatioWidth to aspectRatioHeight
         }
-
-        // Giới hạn kích thước tối đa để tránh quá lớn
-        val maxWidth = 1920 // ví dụ giới hạn Full HD
-        val maxHeight = 1440 // ví dụ giới hạn chiều cao 4:3 tương ứng
-
+        // Tính toán kích thước đầu ra dựa trên resolution
+        val predictedSize = if (sensorRatio > targetRatio) {
+            // Cắt theo chiều rộng
+            val height = sensorHeight
+            val width = (height * ratioW) / ratioH
+            Size(width, height)
+        } else {
+            // Cắt theo chiều cao
+            val width = sensorWidth
+            val height = (width * ratioH) / ratioW
+            Size(width, height)
+        }
+        // Giới hạn kích thước
         val finalWidth = minOf(predictedSize.width, maxWidth)
         val finalHeight = minOf(predictedSize.height, maxHeight)
-
         return Size(finalWidth, finalHeight)
     }
 
@@ -940,6 +1026,7 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
         val overlayBuilder = ImmutableList.Builder<TextureOverlay>()
         val settings = StaticOverlaySettings.Builder()
             .setAlphaScale(1f)
+
             .build()
         val bitmapOverlay =
             BitmapOverlay.createStaticBitmapOverlay(
@@ -978,7 +1065,7 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
 
     fun createHelloTextBitmap(width: Int, height: Int): Bitmap {
         // Vẽ View llMap ra bitmap gốc
-        Log.d("chungvv", "width: $width  /height: $height")
+        Log.d("chungvv createHelloTextBitmap", "width: $width  /height: $height")
         val mapBitmap = binding.layoutOverlay.drawToBitmap()
 
         // Tạo bitmap mới có đúng size mong muốn
