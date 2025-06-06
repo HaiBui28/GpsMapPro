@@ -159,7 +159,7 @@
         <com.tapbi.spark.gpsmappro.ui.custom.CustomLocationImage
             android:id="@+id/customImahe"
             android:layout_width="200dp"
-            android:background="@color/white_1"
+            android:background="@color/red"
             android:layout_marginTop="100dp"
             android:layout_height="200dp"
             app:layout_constraintTop_toTopOf="parent"

@@ -71,6 +71,8 @@ import androidx.media3.effect.StaticOverlaySettings
 import androidx.media3.effect.TextureOverlay
 import androidx.work.await
 import com.google.android.gms.location.LocationServices
+import com.google.android.material.tabs.TabLayout
+import com.google.android.material.tabs.TabLayoutMediator
 import com.google.common.collect.ImmutableList
 import com.tapbi.spark.gpsmappro.App
 import com.tapbi.spark.gpsmappro.R
@@ -416,6 +418,27 @@ class Camera4Fragment : BaseBindingFragment<FragmentCamera4Binding, MainViewMode
         binding.fabFront.setOnClickListener {
             toggleAspectRatio()
         }
+
+        val tab1 = binding.tabLayout.newTab().setText("Quick Share")
+        val tab2 = binding.tabLayout.newTab().setText("Photo")
+        val tab3 = binding.tabLayout.newTab().setText("Video")
+
+        binding.tabLayout.addTab(tab1)
+        binding.tabLayout.addTab(tab2)
+        binding.tabLayout.addTab(tab3)
+        binding.tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+            override fun onTabSelected(tab: TabLayout.Tab?) {
+
+            }
+
+            override fun onTabUnselected(tab: TabLayout.Tab?) {
+
+            }
+
+            override fun onTabReselected(tab: TabLayout.Tab?) {
+
+            }
+        })
     }
 
     private fun shareImage(context: Context, file: File) {
